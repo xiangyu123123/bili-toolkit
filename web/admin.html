@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>反馈收件箱 · Bilibili 增强工具箱</title>
+<link rel="stylesheet" href="assets/site.css">
+<style>
+  body { max-width: 1040px; margin: 0 auto; padding: 28px 20px 80px; }
+  .bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 14px 0 18px; }
+  .bar input[type=password] { flex: 1 1 260px; font: 14px/1 var(--mono); padding: 11px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg-soft); color: var(--text); }
+  .bar input:focus-visible { outline: 3px solid var(--cyan); outline-offset: 2px; }
+  #msg { font-size: 14px; min-height: 22px; margin: 0 0 14px; }
+  #msg.ok { color: var(--cyan); } #msg.err { color: var(--amber); }
+  .card { border: 1px solid var(--line); border-radius: 10px; background: var(--surface); padding: 14px 16px; margin: 0 0 12px; }
+  .card h3 { margin: 0 0 8px; font-size: 15px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .pill { font: 500 12px/1 var(--mono); padding: 4px 8px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line); color: var(--muted); }
+  .pill.page { color: var(--cyan); border-color: #2a4a5c; }
+  .body { font-size: 15px; line-height: 1.65; white-space: pre-wrap; word-break: break-word; margin: 4px 0 8px; }
+  .meta { font-size: 12.5px; color: var(--muted); line-height: 1.7; word-break: break-word; }
+  .row { display: flex; gap: 8px; align-items: center; margin-top: 10px; }
+  .btn.danger { color: #ffd9d9; border-color: #5c2a33; background: #2a1418; }
+  .btn.danger:hover { background: #3a1b21; border-color: #7d3a46; }
+  .empty { color: var(--muted); font-size: 14px; padding: 22px 0; }
+  .hint-inline { font-size: 13px; color: var(--muted); }
+</style>
+</head>
+<body>
+  <h1 style="font-size:22px;margin:0">反馈收件箱</h1>
+  <p class="hint-inline">这一页不在安装页上链接，只有知道地址和你这把密钥的人能打开。密钥存在服务端，页面只把它放在本标签页的 sessionStorage 里。</p>
+
+  <div class="bar">
+    <input id="key" type="password" placeholder="粘贴 FEEDBACK_KEY（在站点设置里填的那个值）" autocomplete="off" spellcheck="false">
+    <button class="btn primary" id="load" type="button">读取反馈</button>
+    <button class="btn tiny" id="refresh" type="button" disabled>刷新</button>
+    <button class="btn tiny" id="export" type="button" disabled>导出 JSON</button>
+    <button class="btn tiny ghost" id="forget" type="button" disabled>清除本页密钥</button>
+  </div>
+  <p id="msg" role="status" aria-live="polite"></p>
+  <div id="list"></div>
+
+<script>
+(function () {
+  'use strict';
+  var keyEl = document.getElementById('key');
+  var msgEl = document.getElementById('msg');
+  var listEl = document.getElementById('list');
+  var btns = { load: document.getElementById('load'), refresh: document.getElementById('refresh'), export: document.getElementById('export'), forget: document.getElementById('forget') };
+  var cache = [];
+
+  var ERRORS = {
+    unauthorized: '密钥不对（401）。',
+    service_not_configured: '服务端还没配置 FEEDBACK_KEY（503）：在站点设置里填上那个密钥值再试。',
+    list_failed: '读取列表失败（503）。',
+    delete_failed: '删除失败（503），条目可能还在。',
+    invalid_id: '要删的编号不合法。',
+    not_found: '接口上没有这个动作。'
+  };
+
+  function say(text, kind) { msgEl.textContent = text; msgEl.className = kind || ''; }
+  function on() { ['refresh', 'export', 'forget'].forEach(function (k) { btns[k].disabled = false; }); }
+
+  function api(action, opts) {
+    var url = '/functions/v1/app?action=' + action;
+    var init = Object.assign({ credentials: 'same-origin', headers: { 'x-feedback-key': keyEl.value.trim() } }, opts || {});
+    return fetch(url, init).then(function (r) {
+      var ct = (r.headers.get('content-type') || '').toLowerCase();
+      if (ct.indexOf('application/json') === -1) throw new Error('HTTP ' + r.status + ' 非 JSON 响应');
+      return r.json().then(function (data) { return { status: r.status, data: data }; });
+    });
+  }
+
+  function fail(err) {
+    var m = String(err && err.message || err);
+    var known = Object.keys(ERRORS).filter(function (k) { return m.indexOf(k) !== -1; })[0];
+    say(known ? ERRORS[known] : '出错了：' + m, 'err');
+  }
+
+  function card(rec) {
+    var box = document.createElement('article');
+    box.className = 'card';
+    var h = document.createElement('h3');
+    [
+      { cls: 'pill page', text: ({ video: '视频播放页', home: '首页/信息流', dynamic: '动态页', space: 'UP主空间', live: '直播页', other: '其它' })[rec.page] || rec.page },
+      { cls: 'pill', text: 'v' + (rec.version || '?') },
+      { cls: 'pill', text: (rec.created_at || '').replace('T', ' ').replace(/\.\d+Z$/, ' UTC') }
+    ].forEach(function (p) { var s = document.createElement('span'); s.className = p.cls; s.textContent = p.text; h.appendChild(s); });
+    box.appendChild(h);
+
+    var body = document.createElement('p');
+    body.className = 'body';
+    body.textContent = rec.unreadable ? '（这条读不出内容，编号 ' + rec.id + '）' : (rec.content || '');
+    box.appendChild(body);
+
+    if (rec.expected) { var e = document.createElement('p'); e.className = 'meta'; e.textContent = '期望：' + rec.expected; box.appendChild(e); }
+    var meta = document.createElement('p');
+    meta.className = 'meta';
+    meta.textContent = (rec.contact ? '联系：' + rec.contact + ' · ' : '') + (rec.browser || '');
+    box.appendChild(meta);
+
+    var row = document.createElement('div');
+    row.className = 'row';
+    var copy = document.createElement('button');
+    copy.className = 'btn tiny'; copy.type = 'button'; copy.textContent = '复制这条';
+    copy.addEventListener('click', function () {
+      var text = JSON.stringify(rec, null, 2);
+      (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(function () { say('已复制这条的 JSON。', 'ok'); }, function () { say('复制失败，手动选一下。', 'err'); });
+    });
+    var del = document.createElement('button');
+    del.className = 'btn tiny danger'; del.type = 'button'; del.textContent = '删除';
+    del.addEventListener('click', function () {
+      if (!window.confirm('删除 ' + rec.id.slice(0, 8) + ' ？这条不可恢复。')) return;
+      del.disabled = true;
+      api('delete', { method: 'POST', headers: { 'content-type': 'application/json', 'x-feedback-key': keyEl.value.trim() }, body: JSON.stringify({ id: rec.id }) })
+        .then(function (res) {
+          if (!res.data || res.data.ok !== true) throw new Error((res.data && res.data.error) || ('HTTP ' + res.status));
+          say('已删除 ' + rec.id.slice(0, 8) + '。', 'ok');
+          load();
+        }, function (err) { del.disabled = false; fail(err); });
+    });
+    row.appendChild(copy); row.appendChild(del);
+    box.appendChild(row);
+    return box;
+  }
+
+  function render(items) {
+    listEl.textContent = '';
+    if (!items.length) { var p = document.createElement('p'); p.className = 'empty'; p.textContent = '没有反馈条目。'; listEl.appendChild(p); return; }
+    items.forEach(function (rec) { listEl.appendChild(card(rec)); });
+  }
+
+  function load() {
+    if (!keyEl.value.trim()) return say('先粘贴密钥。', 'err');
+    say('读取中…');
+    api('list').then(function (res) {
+      if (!res.data || res.data.ok !== true) throw new Error((res.data && res.data.error) || ('HTTP ' + res.status));
+      cache = (res.data.items || []).slice().sort(function (a, b) { return String(b.created_at || '').localeCompare(String(a.created_at || '')); });
+      render(cache);
+      on();
+      try { sessionStorage.setItem('btk.fbkey', keyEl.value.trim()); } catch (e) {}
+      say('共 ' + cache.length + ' 条（服务端 total ' + res.data.total + '）。', 'ok');
+    }, fail);
+  }
+
+  btns.load.addEventListener('click', load);
+  btns.refresh.addEventListener('click', load);
+  btns.forget.addEventListener('click', function () {
+    keyEl.value = ''; try { sessionStorage.removeItem('btk.fbkey'); } catch (e) {}
+    listEl.textContent = ''; cache = []; say('已清除本页密钥。', 'ok');
+  });
+  btns.export.addEventListener('click', function () {
+    var text = JSON.stringify(cache, null, 2);
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+    a.download = 'bili-toolkit-feedback.json';
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000);
+  });
+  keyEl.addEventListener('keydown', function (e) { if (e.key === 'Enter') load(); });
+
+  try {
+    var saved = sessionStorage.getItem('btk.fbkey');
+    if (saved) { keyEl.value = saved; load(); }
+  } catch (e) {}
+})();
+</script>
+</body>
+</html>
