@@ -1,0 +1,11 @@
+# Qoder Sites 插件自有的描述符文件，由工具管理，不入库
+.*.qoder.site
+
+# 本地验证产物
+shots/
+tools/last-run.txt
+.qwen_node_repl_cell_*.mjs
+
+# 系统
+Thumbs.db
+.DS_Store

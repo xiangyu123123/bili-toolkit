@@ -1,0 +1,449 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Bilibili 增强工具箱 · 油猴脚本</title>
+    <meta
+      name="description"
+      content="一个可模块化开关的 Bilibili 桌面端油猴脚本：界面净化、播放增强、素材提取、弹幕评论、视频线路测速与手动选线。含安装入口、快捷键表与已知限制说明。"
+    />
+    <link rel="stylesheet" href="assets/site.css" />
+  </head>
+  <body>
+    <a class="skip" href="#main">跳到主要内容</a>
+
+    <header class="topbar">
+      <div class="wrap bar">
+        <span class="mark">B+</span>
+        <span class="title">Bilibili 增强工具箱</span>
+        <nav aria-label="章节">
+          <a href="#modules">模块</a>
+          <a href="#keys">快捷键</a>
+          <a href="#line">线路测速</a>
+          <a href="#faq">常见问题</a>
+          <a href="#feedback">反馈</a>
+          <a href="#source">源码</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main" class="wrap">
+      <!-- 安装台 -->
+      <section class="install" id="install">
+        <div class="install-head">
+          <h1>一个脚本，五个可独立开关的模块</h1>
+          <p class="lede">
+            装好后在任意 B 站页面点右下角的
+            <b>B+</b> 圆钮（或按 <kbd>Shift</kbd>+<kbd>X</kbd>）打开控制台：左边选模块、右边调参数，每条净化规则和弹幕/评论都会显示<b>本页实时命中数</b>，一眼看出它到底有没有在干活。圆钮和面板都能拖动，位置会记住。
+          </p>
+        </div>
+
+        <div class="actions">
+          <a class="btn primary" href="bili-toolkit.user.js">安装脚本</a>
+          <button class="btn" type="button" data-copy-script>复制完整源码</button>
+          <a class="btn" href="bili-toolkit.user.js" download="bili-toolkit.user.js">下载 .user.js 文件</a>
+        </div>
+        <p class="hint">
+          点「安装脚本」没弹出管理器安装页时：先装管理器，或用「下载文件」再把文件拖进管理器的「实用工具 → 导入」。
+          部分浏览器/管理器需要在设置里打开「允许用户脚本」并授予本站访问权限。
+        </p>
+
+        <ul class="chips">
+          <li>版本 <b id="ver">1.6.1</b></li>
+          <li>生效范围 <b>www / t（动态）/ space / live</b> 桌面端 · 规则按站点分别生效</li>
+          <li>Tampermonkey ✓</li>
+          <li>Violentmonkey ✓</li>
+          <li>需要 GM_setValue</li>
+          <li>不含任何远程依赖</li>
+        </ul>
+
+        <div class="prereq">
+          <h2>装之前要知道的三件事</h2>
+          <ol>
+            <li>它会改页面 DOM 和播放器倍速，属于「自己页面上的自定义」，不绕过会员、不抓取数据、不下载视频流。</li>
+            <li><b>视频线路测速与选线默认是关闭的</b>，需要你主动勾选，因为它会介入播放地址的选择；打开后也是你自己在测速表里点「用这条」，脚本不会替你决定。</li>
+            <li>B 站改版会让部分 CSS 选择器失效。脚本内置了「拾取要隐藏的元素」模式，你可以自己点掉想隐藏的东西，不依赖我猜的选择器。</li>
+          </ol>
+        </div>
+      </section>
+
+      <!-- 模块 -->
+      <section id="modules">
+        <h2>模块清单</h2>
+        <p class="section-lede">名称即控制台左侧的标签页。「限制」一栏是实测过的边界，不是待办。</p>
+
+        <article class="module">
+          <h3>界面净化 <span class="tag on">默认开启</span></h3>
+          <p>往页面注入一张 <code>display:none!important</code> 的样式表。六条规则各自独立开关，面板里每条都带一个<b>命中数徽标</b>：显示这条规则在当前页面匹配到多少个元素，没命中就写「本页无命中」，你不用猜它有没有生效。</p>
+          <div class="cols">
+            <div>
+              <h4>六条内置规则（2026-10 现网实测）</h4>
+              <button class="btn tiny" type="button" data-copy="#sel-all">复制全部选择器</button>
+              <pre id="sel-all" class="code" tabindex="0" role="region" aria-label="内置净化选择器">.bili-feed-card:has(a[href*="cm.bilibili.com"])
+.feed-ad
+[class*="feed-ad"]
+[class*="ad-report"]
+[class*="live-card"]
+.living-entry
+.bili-header__banner
+#bili-header-banner-img
+iframe[src*="jinkela/short"]
+.bili-header .left-entry__item:has(a[href*="live.bilibili.com"])
+.bili-header .left-entry__item:has(a[href*="show.bilibili.com"])
+.bili-header .left-entry__item:has(a[href*="game.bilibili.com"])
+.bili-header .left-entry__item:has(a[href*="manga.bilibili.com"])
+.bili-header .left-entry__item:has(a[href*="/match/"])
+.bili-header .left-entry__item:has(a[href*="app.bilibili.com"])
+.bili-header a[href*="show.bilibili.com"]
+.bili-header a[href*="game.bilibili.com"]
+.bili-header a[href*="manga.bilibili.com"]
+.bili-header a[href*="app.bilibili.com"]
+.vcd:has(.badge-text)
+.vcd
+.bpx-player-top-follow
+.bpx-player-follow
+.bpx-player-progress-popup
+.bili-header__channel
+.header-channel</pre>
+              <p class="hint-inline">顶栏入口用 <code>:has()</code> 连外层容器一起去掉，不留空位；「首页频道导航栏」默认关闭，因为砍掉它改动太大，你自己决定。<b>清掉入口后脚本会把搜索框钉回原宽</b>（B 站给搜索框的是 <code>flex:1</code>，不钉的话它会一路撑到头像前面），并且顶栏只在真正发生重叠时才会自动停用肇事规则，面板里会写明「本站已停用」。</p>
+            </div>
+            <div>
+              <h4>拾取模式（最耐用的一条路）</h4>
+              <p>面板里点「拾取要隐藏的元素」→ 面板自动收起 → 鼠标移到目标上出现粉框 → 点一下：元素当场消失，路径写进「自定义选择器」。<kbd>Esc</kbd> 取消。</p>
+              <p>生成的路径最多四级，优先 <code>#id</code>，其次前两个类名，都没有就退化到 <code>:nth-of-type()</code>。</p>
+              <h4>限制</h4>
+              <ul class="limits">
+                <li>子串匹配可能误伤（某块区域整体类名里含 <code>live-card</code>）。取消那条勾选即可恢复。</li>
+                <li>:has() 需要较新的浏览器；不支持时推广卡那条会退化为只隐藏链接本身。</li>
+                <li>只是不显示，资源仍会请求；不是广告拦截器，也不影响 UP 主收益结算。</li>
+                <li>「恢复默认设置」会连你拾取的规则一起清掉。</li>
+              </ul>
+            </div>
+          </div>
+        </article>
+
+        <article class="module">
+          <h3>播放增强 <span class="tag on">默认开启</span></h3>
+          <p>直接操作 <code>&lt;video&gt;</code> 元素的 <code>playbackRate</code> / <code>volume</code> / <code>currentTime</code>，并在播放器右上角挂一条悬浮工具条。</p>
+          <ul>
+            <li><b>倍速</b>：范围 0.1–上限（默认 5，可调到 16），步长 0.25；「记住并恢复倍速」在换 P、换清晰度后自动回填。</li>
+            <li><b>跳过片头 / 片尾</b>：以「秒」为单位。播放中按 <kbd>Shift</kbd>+<kbd>I</kbd> 记录片头结束点、<kbd>Shift</kbd>+<kbd>O</kbd> 记录片尾提前量，或直接在面板里填数字。</li>
+            <li><b>播完自动连播</b>：优先点播放器自己的「下一 P」按钮，找不到就按 <code>__INITIAL_STATE__</code> 的分 P 列表跳转。</li>
+            <li><b>音量微调</b>：<kbd>,</kbd> <kbd>.</kbd> 每次 ±2%（步长可改）。</li>
+            <li><b>自动最高画质</b>：只从 B 站自己下发的 <code>support_formats</code>（或播放器 <code>getSupportedQualityList()</code>）里取最高档，调 <code>player.requestQuality()</code>，然后<b>轮询确认真切过去了</b>才报成功，切不动就如实显示「未生效，仍在 360P」。实测未登录时列表里虽有 112/80 但切换不生效 —— 需要登录。绝不会自己拼 quality 数值去试会员墙外的档位。</li>
+            <li><b>悬浮工具条</b>：只有 5 个控件 —— 倍速 −/当前值/+、弹幕开关、<code>⋯</code> 展开的二级菜单（设片头、设片尾、复制时间戳、线路测速、打开设置）。实测过：九钮一排会占掉播放器顶部 473px，压到画面上；收窄后是 206px。鼠标进入播放器出现，离开淡出；展开二级菜单时会钉住不消失。</li>
+          </ul>
+          <h4>限制</h4>
+          <ul class="limits">
+            <li>超过 B 站菜单上限的倍速靠 <code>playbackRate</code> 硬调，浏览器可能在高倍速下丢帧或不同步音轨，属正常现象。</li>
+            <li>工具条需要找到播放器容器（<code>#bilibili-player</code> / <code>.bpx-player-video-wrap</code> / <code>.bilibili-player-video-wrap</code> / <code>#mplayer</code>）。找不到时倍速快捷键仍然可用，只是没有悬浮条。</li>
+            <li>片尾跳过是把进度推到最后一刻，若你开了 B 站自带的「播完推荐」，行为会和它抢。</li>
+          </ul>
+        </article>
+
+        <article class="module accent">
+          <h3>观看干扰屏蔽 <span class="tag on">默认开启</span></h3>
+          <p>专治看着看着弹出来的东西：点赞/投币/收藏/关注/充电/试看这类引导提示条，以及播放器内的关注引导层和进度条弹窗。开关在控制台的「播放增强」页底部单独一组。</p>
+          <div class="cols">
+            <div>
+              <h4>两条通道</h4>
+              <p><b>关键词挡提示条</b>：B 站播放器里的浮动引导都走同一套 toast 组件（实测容器 <code>.bpx-player-toast-item</code>，文字在子节点里）。脚本按关键词命中就把这一条 <code>display:none</code>，默认词表：点赞 / 投币 / 收藏 / 关注 / 充电 / 试看 / 大会员 / 免费。</p>
+              <p><b>直接屏蔽引导层</b>：实测存在的 <code>.bpx-player-top-follow</code>、<code>.bpx-player-follow</code>（关注引导）、<code>.bpx-player-progress-popup</code>（充电弹窗）用样式表常驻隐藏，不依赖它什么时候出现。</p>
+            </div>
+            <div>
+              <h4>为什么不是「全关掉」</h4>
+              <p>同一套 toast 也用来播报「网络异常，正在重试」这类有用的信息。所以默认只按关键词挡；想全挡就开「连所有提示条一起隐藏」，代价是故障提示也看不到了 —— 界面上把这层取舍写明了。</p>
+              <h4>限制</h4>
+              <ul class="limits">
+                <li>关键词是纯文本包含匹配：如果某条正常提示里刚好出现「收藏」二字（例如 UP 主自定义的提示），它也会被挡掉。</li>
+                <li>三连引导只在特定时刻出现，本次会话里没等到它；已验证的是同一 toast 机制上的「登录 免费享高清视频试看30秒」和三个引导层被隐藏。若 B 站把引导换成别的组件，这一组会失效，但屏蔽徽标会显示「当前无弹窗元素」而不是假装在工作。</li>
+                <li>挡的是页面显示，不会去点掉、也不会阻止账号状态变化；该给三连还是该给三连由你决定。</li>
+              </ul>
+            </div>
+          </div>
+        </article>
+
+        <article class="module">
+          <h3>素材提取 <span class="tag on">默认开启</span></h3>
+          <p>只在视频页（<code>/video/BV…</code>）有内容，读的是页面自己带的 <code>window.__INITIAL_STATE__</code>，不发额外请求。控制台「素材提取」页给出：</p>
+          <ul>
+            <li>标题、BV 号、aid、发布时间、分 P 数量；</li>
+            <li>封面原图直链（已剥掉 <code>@…</code> 尺寸后缀）：复制直链 / 下载封面；</li>
+            <li>分 P 列表，每行一个「复制直达」按钮（带 <code>?p=</code>）；</li>
+            <li>「复制本页链接」和 <kbd>Shift</kbd>+<kbd>T</kbd> 的当前时间戳链接（<code>?p=1&amp;t=秒</code>）。</li>
+          </ul>
+          <h4>限制</h4>
+          <ul class="limits">
+            <li>下载封面走 <code>fetch → blob</code>，若图床不允许跨域读取会自动降级成「新标签打开原图」并提示你。</li>
+            <li>不提供视频流（m4s/mp4）下载，也不提供分 P 批量抓封面。</li>
+          </ul>
+        </article>
+
+        <article class="module">
+          <h3>弹幕评论 <span class="tag on">默认开启</span></h3>
+          <div class="cols">
+            <div>
+              <h4>弹幕</h4>
+              <p>现网桌面端的弹幕是 <b>DOM 节点</b>（<code>.bili-danmaku-x-dm</code> 这类，挂在 <code>.bpx-player-row-dm-wrap</code> 等层里），不是 canvas。所以做法是：给命中的节点直接加 <code>display:none</code>，而不是去拦 <code>fillText</code>。</p>
+              <p>两条通道：关键词命中单条不显示；<kbd>Shift</kbd>+<kbd>D</kbd> 或面板开关把整层弹幕容器（render/row/adv/bas/cmd 五种 wrap）一起隐藏。</p>
+              <p>面板里有一个 <b>已屏蔽 N 条</b> 的实时计数，为 0 时写「当前无命中弹幕」—— 这个环境里 B 站不给未登录账号下发弹幕，就能看到它到底是「没命中」还是「没弹幕」。</p>
+            </div>
+            <div>
+              <h4>评论</h4>
+              <p>对 <code>.reply-item</code> 做关键词高亮（<code>&lt;mark&gt;</code>，跳过已有链接和已标记文字），命中且开启「自动折叠」时给评论加模糊，点一下展开。</p>
+              <p>懒加载的新评论由一个 400ms 防抖的 MutationObserver 重新扫描。面板同样显示「本页 N 条 / 折叠 M 条」，评论区还没渲染出来就写「未找到评论元素」。</p>
+            </div>
+          </div>
+          <h4>限制</h4>
+          <ul class="limits">
+            <li>弹幕屏蔽依赖 B 站继续用 DOM 渲染弹幕。若某次改版换成 WebGL 画布，这套选择器会失效 —— 判断方法就是看那个实时计数是否一直是 0。</li>
+            <li>屏蔽是本地不显示，不影响服务端弹幕数据，也不会让你发的弹幕被别人屏蔽。</li>
+            <li>评论区需要页面自己渲染出来（未登录或没滚到评论区时没有 <code>.reply-item</code>），此时高亮与折叠无从生效，面板会直接告诉你。</li>
+          </ul>
+        </article>
+
+        <article class="module accent">
+          <h3>线路测速、选线与 PCDN 阻断 <span class="tag off">默认关闭</span></h3>
+          <p>就是「禁用 PCDN + 一键调用最快的视频服务器」，但决定权在你：脚本把播放器这次拿到的全部地址列成一张表，你测完自己点「用这条」。</p>
+          <h4>怎么用（三步）</h4>
+          <ol class="steps">
+            <li>勾选「启用」→ 播放一次或切一次清晰度。脚本同时从页面自带的 <code>window.__playinfo__</code> 和之后的 <code>/x/player/wbi/playurl</code> 响应里收集候选地址；对 <code>__playinfo__</code> <b>只观察不改写</b>（播放器已经消费过它，改写没收益，还会让表格看不到 PCDN 候选）。</li>
+            <li>点「开始测速」。表格按<b>主机</b>聚合（实测一个视频给出 27 条地址但只有 17 个主机，按地址排会满屏重复），每个主机只测一次：取它承载的最高带宽那条流发一次 <code>Range: bytes=0-262143</code> 的 GET，2.5 秒超时、3 路并发、一轮最多 12 个主机。能跨域读 body 的给出 <b>延迟 + Mbps</b>；只回 opaque 响应的退化为 <b>仅 RTT</b>；不响应的标 <b>超时 / 失败</b>。跑完按吞吐降序排列，最高的一行标「· 最快」。</li>
+            <li>点某行的「用这条」→ 主机写进 <code>cdn.pin</code> → 点「重载播放器」或切一次清晰度。之后每次 playurl 响应里，这个节点都被排到列表第一位，其余地址保留作回退。</li>
+          </ol>
+          <p class="hint-inline">
+            锁定优先于自动排序：你选的节点哪怕慢、哪怕它本身是 PCDN，也会被保留并排到最前。「清除锁定」回到自动规则；「按实测延迟自动排序」关掉后就只认你的锁定。
+          </p>
+          <button class="btn tiny" type="button" data-copy="#pcdn-list">复制内置特征串</button>
+          <pre id="pcdn-list" class="code" tabindex="0" role="region" aria-label="PCDN 特征串">pcdn
+mcdn
+pdl
+szbdyd
+ctimous
+upbili</pre>
+          <h4>怎么判断一个节点是不是 PCDN</h4>
+          <p>光靠主机名不够：实测 B 站给的 P2P 节点既有 <code>xy…x.mcdn.bilivideo.cn:8082</code>，也有 <code>….edge.mountaintoys.cn:4483</code> 这种完全不在常见命名规律里的。所以脚本另加一条启发式 —— <b>非标准端口即视为 PCDN</b>（常规 CDN 走 443/80，P2P 走 <code>:8082</code>、<code>:4483</code>）。这条可以单独关掉，端口本身也显示在节点列里，方便你自己判断。</p>
+          <h4>关键一条：B 站把 PCDN 放在主地址，正规 CDN 藏在备用</h4>
+          <p>
+            实测 <code>dash.video[].base_url</code> 给的是 <code>xy&lt;ip&gt;xy.mcdn.bilivideo.cn:8082</code> 这类 peer 地址，而 <code>upos-sz-*</code> / <code>cn-sxxa-*</code> 这些正规节点只出现在
+            <code>backup_url</code> 里。所以「剔除 PCDN」如果按字面删条目，会把整条流删空 —— 脚本的做法是<b>把第一条非 PCDN 的备用提升为主地址</b>，剩下的备用照旧保留。提升后如果某条流实在没有可用备用，才保持原样（不断流优先）。
+          </p>
+          <p class="hint-inline">
+            改完后分片请求的 <code>os=</code> 参数会从 <code>mcdn</code> 变成 <code>coso1bv</code> / <code>hwo1bv</code> 这类正规 CDN 标记 —— 这是判断有没有真的离开 PCDN 最直接的证据。
+          </p>
+
+          <h4>阻断 P2P 调度会话</h4>
+          <p>
+            你关心的「偷上传」：浏览器不能监听端口，peer 没法直接从浏览器拉数据，所以 Web 端参与 P2P 的通道只有那条
+            <code>wss://…player-tracker…socket.io?…sdkVersion=2.14.0%3Aleecher</code> 会话（<code>leecher</code> 就是 P2P 客户端角色）。实测这一页<b>全程没有任何 WebRTC / datachannel</b>。脚本把命中的
+            <code>WebSocket</code> 构造换成一个立即 <code>error/close</code> 的伪装对象（仍满足 <code>instanceof WebSocket</code>，不会让 SDK 崩），引擎就既拿不到 peer、也无处共享。
+          </p>
+          <ul class="limits">
+            <li>只匹配 <code>player-tracker</code> / <code>leecher</code> / <code>pcdn</code> / <code>pdl</code> / <code>p2p</code>；实测聊天广播那条 <code>wss://broadcast.chat.bilibili.com:7826</code> 原样放行，不受影响。</li>
+            <li>面板底部会显示「已拦截 P2P 会话 N 次」，线路页的徽标能看最近一次被拦的地址 —— 不是装了个没有作用开关，是能看到它在挡。</li>
+            <li>模块关闭时完全不拦截任何连接。</li>
+            <li>诚实边界：这能确定断掉的是浏览器侧的 P2P 参与。若你用的是 B 站桌面客户端，它的 PCDN 不在这个脚本的能力范围内。</li>
+          </ul>
+          <h4>边界与限制</h4>
+          <ul class="limits">
+            <li><b>锁定不一定改得到线</b>：B 站按清晰度和区域下发节点，你锁定的主机可能不在下一次响应里。这时表格下方会直接写「锁定的 X 不在本次地址表里，所以这一次不会改线」，而不是假装生效。</li>
+            <li>并发测速会互相抢带宽，绝对数值有噪声（同一主机不同流能差出一倍）。它够用来排序，但不是严谨的带宽测试。</li>
+            <li><b>只在本次响应给出的地址里选</b>，不枚举、不扫描 B 站没给你的节点；测速是你点一次按钮才发一轮，脚本不会自己反复压测。</li>
+            <li>关闭本模块时脚本完全不读取、不解析、不改写任何请求；开启后候选地址表也只存在内存，重载页面即重新采集（持久化的只有你的锁定主机和测速延迟缓存）。</li>
+            <li><code>backup_url</code> 里命中特征串的备用地址会一并剔除；但如果某条流的所有地址都命中，就保持原样不动 —— 宁可继续走 PCDN，也不让播放器拿不到地址。</li>
+            <li>锁定对之后的请求生效：切清晰度、切 P、重载播放器。刚点完不重载是看不到变化的。</li>
+            <li>吞吐数值依赖节点允许跨域读体（带 <code>Range</code> 的 GET）。不少 CDN 只回 opaque 响应，此时只能比 RTT，比不了实际带宽 —— 表格里会明确标出来。</li>
+            <li>开代理/加速器时测出的是代理链路质量，未必等于播放器真实体验。</li>
+          </ul>
+        </article>
+
+        <article class="module">
+          <h3>外观与主题 <span class="tag on">默认跟随 B 站</span></h3>
+          <div class="cols">
+            <div>
+              <h4>三套主题 + 自定义强调色</h4>
+              <p>面板新增「外观」页：<b>跟随 B 站</b>（默认）/ <b>浅色</b> / <b>深色</b>，外加自定义强调色和面板不透明度（60%–100%）。改完立刻生效，不用刷新。</p>
+              <p>「跟随 B 站」不是去猜它当前是深色还是浅色：B 站自己在 <code>:root</code> 上发了一整套设计变量，实测能读到 <code>--bg1_float=#FFFFFF</code>、<code>--bg2=#F6F7F8</code>、<code>--text1=#18191C</code>、<code>--text2=#61666D</code>、<code>--line_regular=#E3E5E7</code>、<code>--brand_pink=#FF6699</code>、<code>--brand_blue=#00AEEC</code>。面板配色直接引用这些变量，所以它切深色模式面板跟着切，颜色也不用我猜。</p>
+              <p>强调色留空就用 B 站的 <code>--brand_pink</code>；自己选一个十六进制色会覆盖到开关、选中项、悬浮球角标、徽标和进度条上。</p>
+            </div>
+            <div>
+              <h4>限制</h4>
+              <ul class="limits">
+                <li><b>只改面板，不改 B 站页面。</b>弹幕、顶栏、信息流配色一律不动 —— 那是 B 站自己的主题，改了容易和它的深色模式打架。</li>
+                <li>播放器右上角那条小工具（倍速 / 弹幕 / ⋯ 二级菜单）<b>同样跟随主题</b>：它压在画面上，所以靠 <code>1px</code> 描边加投影和画面区分，不再固定深色。</li>
+                <li>「跟随 B 站」依赖上面那套变量存在。若某类页面没下发（比如 B 站改版），会退回每档的兜底色值，不会出现白底白字。</li>
+                <li>不透明度用的是 <code>color-mix()</code>（Chromium 111+）。低于 100% 时面板会透出底下的内容，滚动时文字会有点花，默认 100%。</li>
+              </ul>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <!-- 快捷键 -->
+      <section id="keys">
+        <h2>快捷键</h2>
+        <p class="section-lede">
+          前提：播放增强模块开着、焦点不在输入框、没有组合 <kbd>Ctrl</kbd>/<kbd>Cmd</kbd>/<kbd>Alt</kbd>。B 站原生的空格、方向键、<kbd>F</kbd>、<kbd>D</kbd> 都不占用。
+        </p>
+        <table class="keys">
+          <thead>
+            <tr><th scope="col">按键</th><th scope="col">作用</th><th scope="col">备注</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><kbd>,</kbd> / <kbd>.</kbd></td><td>音量 −2% / +2%</td><td>步长在面板里改</td></tr>
+            <tr><td><kbd>[</kbd> / <kbd>]</kbd></td><td>倍速 −0.25 / +0.25</td><td>受「倍速上限」约束</td></tr>
+            <tr><td><kbd>\</kbd></td><td>回到 1.00x</td><td></td></tr>
+            <tr><td><kbd>Shift</kbd>+<kbd>I</kbd></td><td>把当前进度记为片头结束点</td><td>也可在面板填秒</td></tr>
+            <tr><td><kbd>Shift</kbd>+<kbd>O</kbd></td><td>把「距结尾剩余」记为片尾提前量</td><td></td></tr>
+            <tr><td><kbd>Shift</kbd>+<kbd>D</kbd></td><td>隐藏 / 显示弹幕</td><td>WebGL 渲染下见限制</td></tr>
+            <tr><td><kbd>Shift</kbd>+<kbd>T</kbd></td><td>复制当前时间戳链接</td><td>仅视频页</td></tr>
+            <tr><td><kbd>Shift</kbd>+<kbd>X</kbd></td><td>打开 / 关闭设置面板</td><td>右下角 B+ 圆钮等效</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <!-- 线路说明 -->
+      <section id="line">
+        <h2>数据存储</h2>
+        <p>
+          所有开关、倍速、片头片尾秒数、关键词、自定义选择器和测速缓存都写在一个键
+          <code>btk.cfg.v1</code> 下，优先用 <code>GM_setValue</code>（扩展存储，跨标签共享）；管理器不提供 GM 存储时自动退到 <code>localStorage</code>。
+          控制台「关于」页的「恢复默认设置」和管理器菜单里的同名命令会清掉这个键。没有服务端、没有上报、没有任何第三方请求。圆钮和面板的位置也存在同一个键下，拖动后会自动记住。
+        </p>
+      </section>
+
+      <!-- FAQ -->
+      <section id="faq">
+        <h2>常见问题</h2>
+        <details>
+          <summary>装了以后页面上没有 B+ 圆钮</summary>
+          <p>依次检查：管理器里该脚本是否已启用、是否给了 <code>www.bilibili.com</code> 的访问权限、地址是不是桌面端（<code>m.bilibili.com</code>、<code>live.bilibili.com</code> 不在 <code>@match</code> 内）。都正常就硬刷新一次（<kbd>Ctrl</kbd>+<kbd>F5</kbd>），脚本在 <code>document-start</code> 装载，旧标签页不会自动生效。</p>
+        </details>
+        <details>
+          <summary>隐藏了不该隐藏的东西 / 想临时恢复</summary>
+          <p>面板 → 界面净化 → 取消对应分组勾选，或删掉「自定义选择器」里那一条。<code>display:none</code> 只存在于运行时注入的样式表里，不修改你的账号设置。</p>
+        </details>
+        <details>
+          <summary>弹幕关键词没生效</summary>
+          <p>先看面板「弹幕评论」页里的那个徽标。写「当前无命中弹幕」有两种可能：真的没命中，或者这个页面此刻根本没给你下发弹幕（未登录、或该时间点没有流量）—— 这两种状态在界面上分不开，因为脚本只能看到 DOM 里有没有 <code>.bili-danmaku-x-*</code> 节点。若徽标有数但你确定关键词该命中，说明 B 站把弹幕渲染换成了画布，此时 DOM 屏蔽失效，只能用 <kbd>Shift</kbd>+<kbd>D</kbd> 整层隐藏。</p>
+        </details>
+        <details>
+          <summary>测速表里是空的 / 全是「待测」</summary>
+          <p>地址表是从 <code>playurl</code> 响应里现采的：刚勾上「启用」时脚本还没机会读到响应，点「重载播放器」或切一次清晰度就会填上。「待测」是你还没点「开始测速」；测完之后按节点能力分别显示 Mbps、仅 RTT 或失败。</p>
+        </details>
+        <details>
+          <summary>开了线路模块后播放报错 / 黑屏</summary>
+          <p>先在面板里取消勾选「启用」，再点「重载播放器」。这个模块介入的是播放地址的选择，出问题时的正确退路就是关掉它。也可以只关「剔除 PCDN 地址」而保留锁定，用来定位是不是备用地址被剔掉导致的。</p>
+        </details>
+        <details>
+          <summary>为什么线路优选要默认关闭</summary>
+          <p>它会改写播放器拿到的响应，是五个模块里唯一改变「内容从哪里取」的一个。界面净化、倍速、素材、弹幕评论都只影响你这台设备的显示与操作，所以默认开着。</p>
+        </details>
+        <details>
+          <summary>会不会影响 B 站风控 / 封号</summary>
+          <p>脚本不自动发送弹幕、不签到、不点击任务、不做批量请求，测速上限是每次响应最多 6 个主机各一次 <code>HEAD</code>。它仍然是一段在页面上执行的非官方脚本，是否使用由你自己判断。</p>
+        </details>
+      </section>
+
+      <!-- 源码 -->
+      <section id="source">
+        <h2>源码</h2>
+        <p class="section-lede">
+          站点上的 <code>bili-toolkit.user.js</code> 是唯一真相，直接看或复制。共
+          <b id="src-meta">加载中…</b>
+        </p>
+        <div class="src-bar">
+          <button class="btn" type="button" data-copy-script>复制到剪贴板</button>
+          <a class="btn" href="bili-toolkit.user.js" download="bili-toolkit.user.js">下载文件</a>
+          <button class="btn ghost" type="button" id="toggle-src">展开源码</button>
+        </div>
+        <pre id="src" class="code full" hidden></pre>
+      </section>
+
+      <!-- 校验 -->
+      <section id="log">
+        <h2>v1.5.0 的验证范围</h2>
+        <p class="section-lede">这一版是边注入真实页面边改出来的，所以下面区分「页面里验过」和「只在离线环境验过」。</p>
+        <ul class="checks">
+          <li class="done"><b>确实离开了 PCDN</b>：改线后重载真实页面，43 个 m4s 分片请求全部落在 <code>upos-sz-mirrorhwo1 / mirrorcoso1 / mirrorbd.bilivideo.com</code>；日志里 <code>mcdn.bilivideo.cn</code>、<code>mountaintoys</code>、<code>os=mcdn</code> 命中数为 <b>0</b>，<code>os=</code> 全是 <code>coso1bv</code> / <code>hwo1bv</code> / <code>bdbv</code>。播放不受影响：实时推进、readyState 4、无 error、缓冲到片尾。</li>
+          <li class="done"><b>P2P 会话拦截</b>：真实页面徽标显示「已拦截 P2P 会话 3 / 8 次」，被拦的都是 <code>…player-tracker…sdkVersion=2.14.0%3Aleecher</code>；聊天广播 <code>broadcast.chat.bilibili.com:7826</code> 实测原样放行，全程没有 WebRTC。</li>
+          <li class="done"><b>干扰屏蔽</b>：真实页面 <code>.bpx-player-top-follow</code>、<code>.bpx-player-follow</code>、<code>.bpx-player-progress-popup</code> 三个引导层计算样式均为 <code>display:none</code>，徽标显示「本页 3 个引导层」。</li>
+          <li class="done">修掉一个<b>只有真实页面才暴露</b>的缺陷：DOM 扫描原本用纯防抖，而播放时 B 站每帧都在改 DOM，定时器被不断重置导致扫描实际上从不执行（评论与弹窗屏蔽全被拖累）。换成带最小间隔的节流后，新增用例「连续触发 9 次变更后仍完成扫描」通过。</li>
+          <li class="done">修掉一个<b>会断流</b>的设计错误：B 站把 PCDN 放在主地址、正规 CDN 放在 <code>backup_url</code>，按字面「剔除」会把整条流删空。现在改为把非 PCDN 备用提升为主地址；确实没有可用备用时保持原样，不断流优先。</li>
+          <li class="done">净化选择器改为现网实测命中（旧版 13 条里 12 条命中 0）：推广卡 <code>:has()</code> 抓到真实广告、直播卡 30、顶栏入口 10、活动 iframe 2、视频页侧栏广告卡 1。</li>
+          <li class="done">真实页面确认弹幕是 DOM 渲染（<code>.bili-danmaku-x-dm</code> 挂在 <code>.bpx-player-row-dm-wrap</code>），整页仅 1 个 canvas 且是登录二维码 —— 旧版 <code>fillText</code> 画布钩子在现网打不到，已改成 DOM 屏蔽 + 整层隐藏。</li>
+          <li class="done">真实测速：一次播放得到 27 条地址 / 17 个主机，逐主机测出 24ms·88.1Mbps 到 1339ms·1.6Mbps 的区分度；PCDN 与非标准端口节点标注正确；锁定写入配置并在下一次响应里排到首位。</li>
+          <li class="done">界面量化修正：面板 392px 单列 → 620px 分栏控制台，改用 <code>clientWidth</code> 夹取后在 517px 宽窗口里完整可见（旧 <code>100vw</code> 写法溢出到 x=-5）；悬浮条 473px → 206px；tab 焦点、<kbd>Esc</kbd> 关闭、段选倍速改到 <code>playbackRate=2</code> 实测通过。</li>
+          <li class="done">离线回归 30 项断言全过（<code>tools/sandbox-check.mjs</code>）：PCDN 主/备地址剔除、非命中零丢失、干净响应与「全部命中」时不改写、模块关闭时不读取不改写不发包、每主机一轮一次探测、仅 RTT 与失败态、锁定优先于自动排序且保留其余回退。</li>
+          <li class="done">离线回归 50 项断言全过（<code>tools/sandbox-check.mjs</code>：可触发点击与 change、可驱动 MutationObserver 的 DOM 桩），含 <code>instanceof WebSocket</code> 兼容、重复读取不二次过滤、模块关闭时零读取 / 零改写 / 零拦截。</li>
+          <li class="done">动态页与直播页实测取样：动态页 <code>.bili-header</code> 存在（顶栏规则通用）、<code>.bili-dyn-banner</code> 命中 1、<code>game-download-notify-*</code> 命中 1；直播页 <code>.bili-download-panel</code> / <code>.download-panel-ctnr</code> / <code>.link-popup-ctnr</code> / <code>.side-bar-popup-cntr</code> / <code>.banner-area</code> 均存在（banner 类元素 18 个），且直播页没有 <code>.bili-header</code>，那组规则在那里会自然显示「本页无命中」。</li>
+          <li class="todo">自动最高画质在<b>未登录</b>真实页面上不生效：列表给出 112/80/64/32/16，但 <code>requestQuality(112)</code> 之后 <code>getQuality().realQ</code> 仍是 16，面板如实显示「未生效，仍在 360P」。需要你登录后再验一次才算通过。</li>
+          <li class="todo">面板右上角 × 按「<code>setPointerCapture</code> 抢走子按钮 click」的成因改了，程序化点击已验证关闭生效；用真实鼠标点一次的确认还没做。</li>
+          <li class="done">修复动态页头部被压坏：动态页的 <code>.left-entry__item</code> 装的是频道按钮，链接同样命中 <code>:has(a[href*="live.bilibili.com"])</code> 这类顶栏规则，导致导航被删、剩余按钮溢出压住搜索框与头像。实测对比：修复前 <code>.left-entry</code> 从 499px 被压到 <b>177px</b>，加了按站点生效（www / t / space / live 各用自己的规则集）后是 433px（只少了游戏下载图标那 66px），搜索框 467–776、右侧入口 786 起，截图确认无重叠。</li>
+          <li class="done"><b>登录态真实页面已接管核对</b>（Qoder Browser Connector 连上本机 Edge）：动态页当前生效的净化样式只有 <code>.bili-dyn-item:has(.ad-report)</code> / <code>:has(a[href*="cm.bilibili.com"])</code> / <code>[class*="ad-report"]</code> / <code>.bili-dyn-banner</code> 四条，<b>没有任何一条落在顶栏里</b>；首页顶栏三块（导航 24–446、搜索框 456–776、右侧入口 786–1076）几何正常，截图确认无重叠。</li>
+          <li class="done">找到「搜索框和头像挤在一起」的真因：<b>B 站搜索框是 <code>flex:1 1 auto</code></b>，导航入口一旦被清掉，它就从 320px 撑到 <b>642px</b>，右边缘离头像只剩 10px —— 看起来就是压在一起。1.5.0 在应用规则前先量回原宽再钉住：实测钉住后搜索框回到 320px（295–615），与右侧入口之间留 <b>171px</b>。</li>
+          <li class="done">同时修掉一个<b>让净化失效</b>的自检误判：1.4.3/1.4.4 把「导航被清掉后宽度变小」当成顶栏被搞坏，会自动停用顶栏入口 / 顶栏大图 —— 你首页上「本站有 3 条规则因把顶栏搞坏已被自动停用」就是这么来的，等于这个功能被自己的保险丝烧掉了。新自检只认<b>真实重叠</b>（顶栏内可见元素两两求交），停用前还要先试停用一次、确认重叠消失才落盘。</li>
+          <li class="done">自检改为三段式并全部有用例：① 关掉我的样式后仍压 → 判定为 B 站自身布局，走修复梯度（<code>fit</code> 放开 <code>min-width</code> 让搜索框可缩，<code>clip</code> 让导航不换行裁切），<b>只有量测确认重叠消失才保留</b>，两种都无效就撤干净样式并在面板写「两种修复都无效」+ 具体压了多少像素；② 只有开着我的规则才压 → 逐条试停用；③ 停用候选必须通过试停用验证，避免把没肇事的规则一起停掉。</li>
+          <li class="done">面板诚实化：被本站停用的规则不再显示成「开关开着但悄悄不生效」，改显 <b>本站已停用</b>；诊断文本新增窗口尺寸 / DPR / 是否横向溢出 / 顶栏三块的左右边界 / 每一对重叠的像素量。离线回归 <b>75 项全过</b>（<code>tools/sandbox-check.mjs</code>，含顶栏重叠、修复梯度、修复无效、搜索框钉宽四组新用例）。</li>
+          <li class="done">顶栏诊断输出经用例校验：文本包含站点、规则开/关两种顶栏宽度、两侧是否重叠、命中顶栏的规则、本站已停用规则。</li>
+          <li class="done">写用例时抓出测试桩自身的两个失真：<code>getBoundingClientRect</code> 桩没返回 <code>left/right/bottom</code>（几何判定会静默读到 undefined 而永远不误报），选择器桩不支持后代组合器（<code>.bili-header .center-search-container</code> 会退化成匹配 <code>.bili-header</code> 本身）。两者都已修正，否则新用例是「假通过」。</li>
+          <li class="done"><b>主题在你真实浏览器里逐档看过截图</b>：把 1.6.0 注进登录态的 Edge 动态页，「跟随 B 站」实测面板 <code>background:rgb(255,255,255)</code> / 文字 <code>rgb(24,25,28)</code> / 侧栏 <code>rgb(246,247,248)</code>（即 B 站浅色变量解析成功），深色档为 <code>rgb(16,22,32)</code> / <code>rgb(217,227,239)</code>，截图确认标题栏、七个标签页、开关、命中徽标、色块、滑杆都清晰可读。</li>
+          <li class="done">修掉一个<b>只有真机窗口高度才暴露</b>的缺陷：535px 高的窗口里面板 <code>top = -133px</code>，标题栏和 × 被顶出屏幕外（旧版「右上角 × 无效」很可能就有这一份）。现在高度按 <code>100vh - 186px</code> 预留悬浮球位置，极矮窗口改为贴底并保住 200px 最小高度，实测 <code>top = 10px</code> 完整可见。</li>
+          <li class="done">面板 body 的 <b>4px 横向溢出</b>（表现为一条横向滚动条）定位到 B 站全局 reset 不覆盖面板内部，改为面板内统一 <code>border-box</code> 后 <code>scrollWidth</code> 从 463 回到 459 = <code>clientWidth</code>。</li>
+          <li class="todo">三连引导本身没等到（只在特定进度或登录态出现）；已验证的是同一 toast 组件上的「登录 免费享高清视频试看30秒」提示条与三个引导层。</li>
+          <li class="todo">评论高亮 / 折叠仍未拿到真实数据：这次会话里 B 站评论模块自身报 <code>bili comments load error</code>，评论 DOM 不存在。面板徽标会显示「未找到评论元素」。</li>
+          <li class="todo">自动最高画质需要你在登录态的视频页点一次「立即切到最高画质」确认；未登录时 <code>requestQuality(112)</code> 会被接受但不生效，面板会如实显示。</li>
+        </ul>
+        <h3>更新日志</h3>
+        <p><b>1.6.1</b> · 修 1.6.0 引入的一个回归：<b>播放器右上角那条小工具的按钮文字看不见了</b>（只剩 <code>1.00x</code>）。原因是把 <code>.btk-btn</code> 改成主题变量后，工具条自己还留着写死的深色玻璃底，浅色主题下就变成"深字压深底"。现在<b>小工具条和它的 ⋯ 二级菜单整体跟随主题</b>（底色 <code>var(--btk-surface)</code>、描边 <code>var(--btk-line)</code>、投影 <code>var(--btk-shadow)</code>），压在画面上靠描边+投影区分。真实视频页实测：浅色下按钮 <code>rgb(24,25,28)</code> 字 / <code>rgb(246,247,248)</code> 底，条底 <code>rgb(255,255,255)</code>，读数 <code>rgb(0,174,236)</code>。离线回归 97 项全过（新增 6 项专测工具条配色）。</p>
+        <p><b>1.6.0</b> · 加了<b>「外观」页</b>：面板不再只有深色一套 —— 跟随 B 站 / 浅色 / 深色 三档，外加自定义强调色与面板不透明度，改完立即生效。「跟随 B 站」直接引用 B 站自己在 <code>:root</code> 上发的设计变量（<code>--bg1_float</code> / <code>--text1</code> / <code>--brand_pink</code> 等，现网实测可读），所以它切深色模式面板跟着切，不需要猜。顺带修掉两个在真实浏览器里才看得出来的问题：<b>矮窗口下面板顶出视口</b>（535px 高的窗口里 <code>top = -133px</code>，标题栏和 × 直接被推到屏幕外够不着 —— 这也是之前「右上角 × 无效」的一个成因），现在高度先扣掉悬浮球占位并保证留在视口内；<b>面板 body 出现 4px 横向滚动条</b>（B 站的全局 reset 不覆盖面板内部，<code>width:100%</code> 元素加 padding 就溢出），改为面板内统一 <code>border-box</code>。离线回归 91 项全过。</p>
+        <p><b>1.5.0</b> · 顶栏这块重做了：<b>①</b> 清掉顶栏入口后自动把搜索框钉回原宽（B 站是 <code>flex:1</code>，实测会被撑到 642px 顶到头像前，这就是「搜索框和头像重叠」的真相）；<b>②</b> 自检不再把「导航变窄」误判成顶栏坏掉 —— 旧版这条误判会自动停用顶栏入口/顶栏大图，等于功能被自己的保险丝烧掉，现在只认两两求交出来的真实重叠，且停用前必须试停用确认有效；<b>③</b> 判定为 B 站自身布局时改走修复梯度（放开 <code>min-width</code> / 导航裁切），量测确认重叠消失才保留，无效就撤干净并如实报告；<b>④</b> 面板里被本站停用的规则明确标注「本站已停用」，新增「重测顶栏」，诊断补上窗口尺寸 / DPR / 横向溢出 / 三块边界 / 重叠像素；<b>⑤</b> 「本页全部停用净化」改为可恢复，不再直接删掉你的自定义选择器。离线回归 75 项全过。</p>
+        <p><b>1.4.4</b> · 「界面净化」页新增<b>复制顶栏诊断</b>：一键把当前站点、顶栏在规则开/关两种状态下的宽度、是否重叠、哪些规则命中了顶栏内部、本站被停用了哪几条，拼成一段文本复制出来 —— 不需要装任何调试工具，也不需要连浏览器连接器，就能把真实页面的几何情况反馈出来。</p>
+        <p><b>1.4.3</b> · 顶栏自愈：不再依赖我预设"哪条规则危险" —— 脚本会对比规则开/关时的顶栏宽度与重叠情况，一旦发现是内置规则把顶栏搞塌或让导航压到搜索框，就自动在<b>该站点</b>停用这些规则并提示，面板「界面净化」里给出「恢复本站顶栏规则」和「本页全部停用净化」两个退路。自检改为等顶栏渲染出来再判定（之前会在渲染前就把自已标记为已检查，导致永远不生效）。</p>
+        <p><b>1.4.2</b> · 二次修复动态页顶栏重叠：<code>[class*="game-download-notify"]</code> 本身就是 <code>.left-entry__item</code> 导航项，删掉它会让顶栏塌宽、频道行钻到搜索框底下，已从规则里移除；并加了顶栏重叠自检（若确认是内置规则造成的，就自动停用顶栏规则并提示）。实测动态页顶栏与未装脚本时逐像素一致。</p>
+        <p><b>1.4.1</b> · 修复动态页头部重叠：净化规则改为按站点分别生效（www / t / space / live），顶栏入口一类只在首页语义正确的规则不再套到动态页；面板「界面净化」顶部显示当前站点与本页适用的规则条数。</p>
+        <p><b>1.4.0</b> · 生效范围扩到动态（t.bilibili.com）、UP 主空间（space.bilibili.com）与直播（live.bilibili.com），并按现网实测新增三组规则：动态推广卡（<code>.bili-dyn-item:has(.ad-report)</code> 等）、动态横幅与游戏下载提示（<code>.bili-dyn-banner</code>、<code>game-download-notify-*</code>）、直播页下载位与活动弹窗（<code>.bili-download-panel</code>、<code>.download-panel-ctnr</code>、<code>.link-popup-ctnr</code>、<code>.side-bar-popup-cntr</code>、<code>.banner-area</code>）；新增自动最高画质（带生效确认）；修复面板右上角 × 点不动 —— 原因是拖拽在 pointerdown 就 <code>setPointerCapture</code>，把子按钮的 click 抢走了，现在越过移动阈值才抢占且在控件上不启动拖拽。</p>
+        <p><b>1.3.0</b> · 新增：阻断 P2P 调度会话（带拦截计数）、主地址为 PCDN 时把非 PCDN 备用提升为主地址、观看干扰屏蔽组（提示条关键词 + 关注/充电引导层）、视频页侧栏广告卡规则、面板标签页记忆与方向键切换；修复：DOM 扫描被持续变更饿死、伪装 socket 不过 <code>instanceof</code>。</p>
+        <p><b>1.2.0</b> · 按真实页面证据重做：净化换成实测命中的六组并逐条显示命中数；弹幕从画布钩子改为 DOM 屏蔽；面板改为分栏控制台 + 可拖动 + <kbd>Esc</kbd> 关闭；悬浮条收细为 5 钮 + 二级菜单；线路表按主机聚合、加非标准端口启发式与「锁定节点不在本次表内」的显式提示。</p>
+        <p><b>1.1.0</b> · 线路模块改为可视化测速菜单：候选节点表格、每节点单次下载探测、手动「用这条」锁定；补齐 <code>backup_url</code> 剔除与全命中时不改写的守护。</p>
+        <p><b>1.0.0</b> · 首个版本：五个模块、面板与拾取模式、8 组快捷键、GM 菜单命令。</p>
+      </section>
+
+      <!-- 反馈 -->
+      <section id="feedback">
+        <h2>反馈</h2>
+        <p class="section-lede">不用截图、不用开控制台：在跑脚本的那个页面里点一下就能生成完整上下文。</p>
+        <div class="cols">
+          <div>
+            <h4>怎么提一条能直接定位的反馈</h4>
+            <ol class="steps">
+              <li>在 B 站页面点右下角 <b>B+</b> 悬浮球打开控制台（或按 <kbd>Alt</kbd>+<kbd>S</kbd>）。</li>
+              <li>切到<b>「关于」</b>页 → 点<b>「复制反馈包」</b>。</li>
+              <li>把内容贴到 GitHub Issue（仓库：<code id="repo-url">https://github.com/xiangyu123123/bili-toolkit</code>），标题带上页面类型，例如 <code>[动态页] 顶栏入口规则把导航删掉了</code>。</li>
+            </ol>
+            <p class="hint-inline">反馈包里含：版本、页面地址与站点前缀、窗口尺寸与 DPR、浏览器 UA、五个模块开关、每条净化规则在本页的命中数、被本站自动停用了哪几条、顶栏修复策略与重叠像素、搜索框钉宽值、线路锁定与 P2P 拦截计数、主题设置。</p>
+          </div>
+          <div>
+            <h4>不会包含什么</h4>
+            <ul class="limits">
+              <li>不含 Cookie、登录凭据、token、观看历史、私信内容 —— 全是脚本自身配置与 DOM 几何读数。</li>
+              <li>不主动上传：复制走你浏览器的剪贴板，脚本不发任何网络请求，也没有统计代码。</li>
+            </ul>
+            <h4>自动更新</h4>
+            <p>脚本头部带 <code>@downloadURL</code> / <code>@updateURL</code>，指向本页同域的 <code>bili-toolkit.user.js</code>；Tampermonkey 会按它自己的更新周期检查并提示升级，也可以在扩展面板里手动「检查更新」。</p>
+            <button class="btn tiny" type="button" data-copy="#env-pack">复制本页环境</button>
+            <pre id="env-pack" class="code" tabindex="0" role="region" aria-label="本页环境"></pre>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="wrap foot">
+      <p>Bilibili 增强工具箱 · 单文件油猴脚本 · 无远程依赖 · 数据只存在你的浏览器扩展存储里</p>
+    </footer>
+
+    <div id="status" role="status" aria-live="polite"></div>
+    <script src="assets/site.js"></script>
+  </body>
+</html>
