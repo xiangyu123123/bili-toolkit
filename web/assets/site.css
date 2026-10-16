@@ -481,3 +481,31 @@ details p {
     font-size: 14px;
   }
 }
+
+/* ---------- 反馈表单 ---------- */
+.fb-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 14px 0 6px; }
+.fb-grid label { display: flex; flex-direction: column; gap: 6px; font-size: 13.5px; color: var(--muted); }
+.fb-grid label.wide { grid-column: 1 / -1; }
+.fb-grid input,
+.fb-grid select,
+.fb-grid textarea {
+  font: 14px/1.6 var(--sans);
+  color: var(--text);
+  background: var(--bg-soft);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 9px 11px;
+  width: 100%;
+}
+.fb-grid textarea { resize: vertical; min-height: 74px; }
+.fb-grid input:focus-visible,
+.fb-grid select:focus-visible,
+.fb-grid textarea:focus-visible { outline: 3px solid var(--cyan); outline-offset: 2px; }
+.fb-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+#fb-result { margin: 10px 0 0; font-size: 14px; min-height: 22px; }
+#fb-result.ok { color: var(--cyan); }
+#fb-result.err { color: var(--amber); }
+.btn[disabled] { opacity: .55; cursor: progress; }
+@media (max-width: 720px) {
+  .fb-grid { grid-template-columns: 1fr; }
+}

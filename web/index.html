@@ -363,7 +363,7 @@ upbili</pre>
 
       <!-- 校验 -->
       <section id="log">
-        <h2>v1.5.0 的验证范围</h2>
+        <h2>v1.6.2 的验证范围</h2>
         <p class="section-lede">这一版是边注入真实页面边改出来的，所以下面区分「页面里验过」和「只在离线环境验过」。</p>
         <ul class="checks">
           <li class="done"><b>确实离开了 PCDN</b>：改线后重载真实页面，43 个 m4s 分片请求全部落在 <code>upos-sz-mirrorhwo1 / mirrorcoso1 / mirrorbd.bilivideo.com</code>；日志里 <code>mcdn.bilivideo.cn</code>、<code>mountaintoys</code>、<code>os=mcdn</code> 命中数为 <b>0</b>，<code>os=</code> 全是 <code>coso1bv</code> / <code>hwo1bv</code> / <code>bdbv</code>。播放不受影响：实时推进、readyState 4、无 error、缓冲到片尾。</li>
@@ -396,6 +396,7 @@ upbili</pre>
           <li class="todo">自动最高画质需要你在登录态的视频页点一次「立即切到最高画质」确认；未登录时 <code>requestQuality(112)</code> 会被接受但不生效，面板会如实显示。</li>
         </ul>
         <h3>更新日志</h3>
+        <p><b>1.6.2</b> · 反馈能直接交了：<b>「反馈」章节做成页内表单</b>（选页面类型、写现象、可选期望与联系方式），提交走同源 <code>POST /functions/v1/app?action=submit</code>，服务端校验后把每一条存成站点私有存储里的 <code>feedback/&lt;uuid&gt;.json</code> —— 站点不开放列表和下载，所以<b>访客写得进、读不出</b>，站主侧可列可下可删。已端到端验证：真实提交返回编号 <code>6c3e4f96</code>，后台列到 <code>738B / application/json</code>，下载回来字段完整。<b>Function 侧的边界全部有用例</b>：正常 201、未知 action 404、GET 405、非 JSON 415、超长体 413、现象过短 400、非法页面 400、空版本 400、控制字符清洗后 201、存储失败 503（且不自动重放）。同时脚本新增 <code>@downloadURL</code>/<code>@updateURL</code>（Tampermonkey 从此能自动检查升级）与控制台「关于 → 复制反馈包」；离线回归 106 项全过。</p>
         <p><b>1.6.1</b> · 修 1.6.0 引入的一个回归：<b>播放器右上角那条小工具的按钮文字看不见了</b>（只剩 <code>1.00x</code>）。原因是把 <code>.btk-btn</code> 改成主题变量后，工具条自己还留着写死的深色玻璃底，浅色主题下就变成"深字压深底"。现在<b>小工具条和它的 ⋯ 二级菜单整体跟随主题</b>（底色 <code>var(--btk-surface)</code>、描边 <code>var(--btk-line)</code>、投影 <code>var(--btk-shadow)</code>），压在画面上靠描边+投影区分。真实视频页实测：浅色下按钮 <code>rgb(24,25,28)</code> 字 / <code>rgb(246,247,248)</code> 底，条底 <code>rgb(255,255,255)</code>，读数 <code>rgb(0,174,236)</code>。离线回归 97 项全过（新增 6 项专测工具条配色）。</p>
         <p><b>1.6.0</b> · 加了<b>「外观」页</b>：面板不再只有深色一套 —— 跟随 B 站 / 浅色 / 深色 三档，外加自定义强调色与面板不透明度，改完立即生效。「跟随 B 站」直接引用 B 站自己在 <code>:root</code> 上发的设计变量（<code>--bg1_float</code> / <code>--text1</code> / <code>--brand_pink</code> 等，现网实测可读），所以它切深色模式面板跟着切，不需要猜。顺带修掉两个在真实浏览器里才看得出来的问题：<b>矮窗口下面板顶出视口</b>（535px 高的窗口里 <code>top = -133px</code>，标题栏和 × 直接被推到屏幕外够不着 —— 这也是之前「右上角 × 无效」的一个成因），现在高度先扣掉悬浮球占位并保证留在视口内；<b>面板 body 出现 4px 横向滚动条</b>（B 站的全局 reset 不覆盖面板内部，<code>width:100%</code> 元素加 padding 就溢出），改为面板内统一 <code>border-box</code>。离线回归 91 项全过。</p>
         <p><b>1.5.0</b> · 顶栏这块重做了：<b>①</b> 清掉顶栏入口后自动把搜索框钉回原宽（B 站是 <code>flex:1</code>，实测会被撑到 642px 顶到头像前，这就是「搜索框和头像重叠」的真相）；<b>②</b> 自检不再把「导航变窄」误判成顶栏坏掉 —— 旧版这条误判会自动停用顶栏入口/顶栏大图，等于功能被自己的保险丝烧掉，现在只认两两求交出来的真实重叠，且停用前必须试停用确认有效；<b>③</b> 判定为 B 站自身布局时改走修复梯度（放开 <code>min-width</code> / 导航裁切），量测确认重叠消失才保留，无效就撤干净并如实报告；<b>④</b> 面板里被本站停用的规则明确标注「本站已停用」，新增「重测顶栏」，诊断补上窗口尺寸 / DPR / 横向溢出 / 三块边界 / 重叠像素；<b>⑤</b> 「本页全部停用净化」改为可恢复，不再直接删掉你的自定义选择器。离线回归 75 项全过。</p>
@@ -413,7 +414,42 @@ upbili</pre>
       <!-- 反馈 -->
       <section id="feedback">
         <h2>反馈</h2>
-        <p class="section-lede">不用截图、不用开控制台：在跑脚本的那个页面里点一下就能生成完整上下文。</p>
+        <p class="section-lede">直接在下面填、直接提交 —— 不用登录 GitHub，也不用离开这一页。</p>
+
+        <form id="feedback-form" autocomplete="off">
+          <div class="fb-grid">
+            <label>出问题的页面
+              <select id="fb-page">
+                <option value="video">视频播放页</option>
+                <option value="home">首页 / 信息流</option>
+                <option value="dynamic">动态页</option>
+                <option value="space">UP 主空间</option>
+                <option value="live">直播页</option>
+                <option value="other">其它 / 说不清</option>
+              </select>
+            </label>
+            <label>脚本版本
+              <input id="fb-version" maxlength="24" placeholder="例如 1.6.2">
+            </label>
+            <label class="wide">现象（必填，至少 5 个字）
+              <textarea id="fb-content" rows="4" maxlength="2000" required placeholder="例：动态页顶栏的搜索框被撑得很宽，压到头像那边了"></textarea>
+            </label>
+            <label class="wide">你期望是什么样（可选）
+              <textarea id="fb-expected" rows="2" maxlength="2000" placeholder="例：清掉顶栏入口之后搜索框保持原来的宽度"></textarea>
+            </label>
+            <label class="wide">怎么回你（可选，只用来回这条反馈）
+              <input id="fb-contact" maxlength="80" placeholder="邮箱 / QQ / 留空">
+            </label>
+          </div>
+          <p class="hint-inline">提交时会自动附上浏览器信息（UA、窗口尺寸、语言）。<b>访客只能写入，读不到任何一条反馈</b>（包括自己刚提的）—— 每条反馈存成站点私有存储里的一个 JSON 对象，站点不对外提供列表或下载，读取和清理只能由站主在后台做。想带上脚本内部状态（模块开关、每条规则命中数、顶栏几何），在 B 站页面里按 <kbd>Alt</kbd>+<kbd>S</kbd> →「关于」→「复制反馈包」，把结果粘到上面。</p>
+          <div class="fb-actions">
+            <button class="btn primary" type="submit" id="fb-submit">提交反馈</button>
+            <button class="btn tiny" type="button" id="fb-copy-form">复制我填的内容</button>
+            <button class="btn tiny ghost" type="button" id="fb-fill-env">填入我的环境</button>
+          </div>
+          <p id="fb-result" role="status" aria-live="polite"></p>
+        </form>
+
         <div class="cols">
           <div>
             <h4>怎么提一条能直接定位的反馈</h4>

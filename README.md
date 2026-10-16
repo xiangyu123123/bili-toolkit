@@ -57,22 +57,53 @@ wss://ali-web-player-tracker.biliapi.net/socket.io/?...&sdkVersion=2.14.0%3Aleec
 
 ## 反馈
 
-在跑脚本的那个页面里：右下角 **B+** → **「关于」** → **「复制反馈包」**。
+两条路，都不需要开控制台或截图：
 
-反馈包一次带齐：版本、页面地址与站点前缀、窗口尺寸与 DPR、浏览器 UA、五个模块开关、每条净化规则在本页的命中数、被本站自动停用了哪几条、顶栏修复策略与重叠像素、搜索框钉宽值、线路锁定与 P2P 拦截计数、主题设置。**不含** Cookie、凭据、token、观看历史、私信内容；复制走剪贴板，脚本不发任何网络请求。
+1. **安装页页内表单** —— <https://bili-toolkit-ppywmt0k7sa.qoder.website/#feedback> 填完直接提交，不用登录 GitHub。
+   前端走同源 `POST /functions/v1/app?action=submit`，`functions/handler.mjs` 校验后把每条存成站点私有
+   Storage 里的 `feedback/<uuid>.json`。站点**不开放列表与下载**，所以访客写得进、读不出（包括自己刚提的）；
+   站主侧用后台文件工具 list / download / delete。
+2. **反馈包** —— 在跑脚本的页面里：右下角 **B+** → **「关于」** → **「复制反馈包」**，再贴到 Issue
+   <https://github.com/xiangyu123123/bili-toolkit/issues>。标题带上页面类型，例如
+   `[动态页] 顶栏入口规则把导航删掉了`。
 
-提 Issue：<https://github.com/xiangyu123123/bili-toolkit/issues>，标题带上页面类型，例如 `[动态页] 顶栏入口规则把导航删掉了`。
+反馈包内容：版本、页面地址与站点前缀、窗口尺寸与 DPR、浏览器 UA、五个模块开关、每条净化规则在本页的命中数、
+被本站自动停用了哪几条、顶栏修复策略与重叠像素、搜索框钉宽值、线路锁定与 P2P 拦截计数、主题设置。
+**不含** Cookie、凭据、token、观看历史、私信内容；复制走剪贴板，脚本不发任何网络请求。
+
+### Function 的输入边界
+
+| 情况 | 结果 |
+| --- | --- |
+| 合法提交 | `201 {ok:true,id}` |
+| `action` 不是 `submit` | `404 not_found` |
+| `GET` / 其他方法 | `405 method_not_allowed`（`allow: POST`） |
+| `Content-Type` 非 `application/json` | `415 invalid_content_type` |
+| 请求体 > 8192 B | `413 invalid_body_size` |
+| 非法 JSON / 非对象 | `400 invalid_json` |
+| `page` 不在白名单（含 `../../etc` 这类） | `400 invalid_page` |
+| `version` / `browser` 空、`content` < 5 字 | `400` 对应错误码 |
+| 控制字符、超长字段 | 清洗 + 截断后接受（上限见 `LIMITS`） |
+| 存储写入失败 | `503 save_failed`，**不自动重放** |
+
+对象路径只由服务端用 `crypto.randomUUID()` 生成，浏览器给不出任何路径片段。
 
 ## 开发
 
 ```text
 web/bili-toolkit.user.js   脚本本体（单文件，无构建步骤）
-web/index.html             安装页 / 文档
+web/index.html             安装页 / 文档 / 反馈表单
 web/assets/site.css        安装页样式
-web/assets/site.js         安装页交互（复制、源码展开、版本读取）
+web/assets/site.js         安装页交互（复制、源码展开、版本读取、反馈表单提交）
+functions/index.ts         Edge Function 入口：Deno.serve + 平台注入的 storage SDK
+functions/handler.mjs      反馈校验与写入；storage 以参数注入，便于本地用假实现跑边界
 tools/sandbox-check.mjs    无界面回归：在可触发事件的 DOM 桩里执行脚本
 tools/serve-cors.py        本地静态服务（127.0.0.1:4174），用于把脚本注进真实页面
 ```
+
+部署参数（Qoder Sites）：`webDirectory: "web"`、`functionDirectory: "functions"`、
+`databaseAccess: "none"`。Function 运行时 `edge`、`authMode: anonymous`，写请求由网关做同源校验。
+本地校验 `handler.mjs` 不需要 Deno 或凭据：把假 `storage` 直接传进去即可（见上面的边界表）。
 
 跑回归（需要 Node，脚本用 `node:vm` 起沙箱，无第三方依赖）：
 
@@ -85,9 +116,12 @@ DOM 桩会模拟：元素树、`querySelector` 选择器匹配（含后代组合
 
 ## 隐私
 
-- 没有服务端、没有统计、没有第三方库、没有任何远程请求（除了 B 站自己下发的资源）。
-- 配置存在浏览器扩展存储（`GM_setValue`，无扩展时退到 `localStorage`）的 `btk.cfg.v1` 键下。
-- 线路候选地址表只存在内存，刷新页面即重新采集。
+- **脚本侧**：没有服务端、没有统计、没有第三方库、没有任何远程请求（除了 B 站自己下发的资源）。
+  你主动点的「下载封面 / 复制直链 / 测速」除外 —— 测速只会对你这次拿到的 B 站地址发请求。
+- **配置存储**：`GM_setValue`（无扩展存储时退到 `localStorage`）的 `btk.cfg.v1` 一个键下。
+  线路候选地址表只存在内存，刷新页面即重新采集。
+- **安装页的反馈表单**是唯一会把数据发出去的入口，且只发到本站自己的同源 Function；
+  不接第三方分析、不写 Cookie、不做跨站请求。你不放心完全可以不用它，改用 Issue。
 
 ## 许可
 
