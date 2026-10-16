@@ -316,6 +316,7 @@
   }
 
   let consoleItems = [];
+  let dialogMode = 'login';
 
   function loadConsole() {
     authMsg('读取中…');
@@ -325,11 +326,15 @@
         throw new Error(errText(res));
       }
       consoleItems = (res.data.items || []).slice().sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
+      const unread = consoleItems.filter((r) => r.status === 'new').length;
+      const countEl = document.getElementById('auth-count');
+      countEl.textContent = String(unread);
+      countEl.hidden = unread === 0;
       const stats = document.getElementById('fb-stats');
       stats.textContent = '';
       stats.appendChild(pill('共 ' + consoleItems.length + ' 条'));
       stats.appendChild(pill('服务端 total ' + res.data.total));
-      stats.appendChild(pill('未处理 ' + consoleItems.filter((r) => r.status === 'new').length + ' 条'));
+      stats.appendChild(pill('未处理 ' + unread + ' 条'));
       const list = document.getElementById('fb-items');
       list.textContent = '';
       if (!consoleItems.length) {
@@ -345,43 +350,58 @@
   }
 
   function showLoggedOut() {
+    setZone(false);
+    dialogMode = 'login';
+    document.getElementById('auth-console-link').hidden = true;
+    document.getElementById('auth-logout').hidden = true;
+    document.getElementById('auth-open').hidden = false;
     document.getElementById('console').hidden = true;
-    document.getElementById('auth-form').hidden = false;
-    document.getElementById('auth-out').hidden = true;
     call('status').then((res) => {
       const has = !!(res.data && res.data.has_account);
-      document.getElementById('auth-title').textContent = has ? '站主登录' : '初始化站主账号';
+      dialogMode = has ? 'login' : 'setup';
+      document.getElementById('auth-dialog-title').textContent = has ? '站主登录' : '初始化站主账号';
       document.getElementById('auth-go').textContent = has ? '登录' : '创建并登录';
-      document.getElementById('auth-note').textContent = has
-        ? '登录后这一页会多出后台：反馈全文列表、逐条删除、导出 JSON。游客只能提交，看不到任何一条 —— 列表数据每次都要服务端校验会话令牌后才返回，不是靠页面隐藏。'
-        : '第一次使用：设置一个账号和密码（密码至少 10 位），只有这一次能创建。密码只在服务端存 PBKDF2 散列，明文不落盘、不进仓库、也不经过聊天。';
+      document.getElementById('auth-mode').textContent = has ? '' : '第一次使用：现在设置的账号密码就是站主凭据，只有这一次能创建。';
+      document.getElementById('auth-lede').textContent = has
+        ? '登录后这一页会多出后台：反馈全文列表、逐条删除、导出 JSON。游客只能提交，看不到任何一条。'
+        : '密码至少 10 位。服务端只存 PBKDF2-SHA256 散列和随机 salt，明文不落盘、不进仓库、也不经过聊天。';
     }, () => {});
   }
 
+  function setZone(loggedIn, user) {
+    document.getElementById('auth-open').hidden = loggedIn;
+    document.getElementById('auth-console-link').hidden = !loggedIn;
+    document.getElementById('auth-logout').hidden = !loggedIn;
+    if (user) document.getElementById('auth-console-link').title = '已登录：' + user;
+  }
+
   function showLoggedIn(user) {
+    setZone(true, user);
     document.getElementById('console').hidden = false;
-    document.getElementById('auth-form').hidden = true;
-    document.getElementById('auth-out').hidden = false;
-    document.getElementById('auth-title').textContent = '已登录：' + (user || '站主');
     loadConsole();
   }
 
   function wireConsole() {
-    const form = document.getElementById('auth-form');
-    if (!form) return;
-    let mode = 'login';
+    const dialog = document.getElementById('auth-dialog');
+    const userEl = document.getElementById('auth-user');
+    const passEl = document.getElementById('auth-pass');
+    const goBtn = document.getElementById('auth-go');
 
-    form.addEventListener('submit', (e) => {
-      e.preventDefault();
-      const payload = {
-        user: document.getElementById('auth-user').value.trim(),
-        password: document.getElementById('auth-pass').value
-      };
+    document.getElementById('auth-open').addEventListener('click', () => {
+      authMsg('');
+      dialog.showModal();
+      userEl.focus();
+    });
+    document.getElementById('auth-close').addEventListener('click', () => dialog.close());
+    dialog.addEventListener('click', (e) => { if (e.target === dialog) dialog.close(); });
+
+    function submitAuth() {
+      const payload = { user: userEl.value.trim(), password: passEl.value };
       if (!payload.user || !payload.password) return authMsg('账号和密码都要填。', 'err');
-      const go = document.getElementById('auth-go');
-      go.disabled = true;
-      authMsg(mode === 'setup' ? '创建中…' : '登录中…');
-      const start = mode === 'setup'
+      goBtn.disabled = true;
+      goBtn.textContent = dialogMode === 'setup' ? '创建中…' : '登录中…';
+      authMsg('');
+      const start = dialogMode === 'setup'
         ? call('setup', { method: 'POST', body: JSON.stringify(payload) }).then((res) => {
             if (!res.data || res.data.ok !== true) throw new Error(errText(res));
             return call('login', { method: 'POST', body: JSON.stringify(payload) });
@@ -391,18 +411,29 @@
       start.then((res) => {
         if (!res.data || res.data.ok !== true) throw new Error(errText(res));
         setToken(res.data.token);
-        document.getElementById('auth-pass').value = '';
-        go.disabled = false;
+        passEl.value = '';
+        goBtn.disabled = false;
+        goBtn.textContent = '登录';
+        dialog.close();
         showLoggedIn(res.data.user);
-        say('已登录，反馈后台就在下面。');
-      }, (err) => { go.disabled = false; failAuth(err); });
-    });
+        say('已登录，反馈后台在页面下方。');
+      }, (err) => {
+        goBtn.disabled = false;
+        goBtn.textContent = dialogMode === 'setup' ? '创建并登录' : '登录';
+        failAuth(err);
+      });
+    }
 
-    document.getElementById('auth-out').addEventListener('click', () => {
+    goBtn.addEventListener('click', submitAuth);
+    [userEl, passEl].forEach((el) => el.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); submitAuth(); }
+    }));
+
+    document.getElementById('auth-logout').addEventListener('click', () => {
       call('logout', { method: 'POST', body: '{}' }).catch(() => {});
       setToken('');
       showLoggedOut();
-      authMsg('已退出本页登录（会话令牌已作废）。', 'ok');
+      say('已退出，会话令牌已作废。');
     });
 
     document.getElementById('fb-reload').addEventListener('click', loadConsole);
@@ -414,14 +445,38 @@
       setTimeout(() => URL.revokeObjectURL(a.href), 4000);
     });
 
-    call('status').then((res) => {
-      mode = res.data && res.data.has_account ? 'login' : 'setup';
-      if (token()) showLoggedIn();
-      else showLoggedOut();
-    }, () => { mode = 'login'; showLoggedOut(); });
+    if (token()) showLoggedIn();
+    else showLoggedOut();
+  }
+
+  /* ------------------------------------------------------------ 主题开关 */
+
+  function wireTheme() {
+    const btn = document.getElementById('theme-btn');
+    const root = document.documentElement;
+    const LABEL = { auto: '跟随浏览器', light: '浅色', dark: '深色' };
+    const GLYPH = { auto: '◐', light: '☀', dark: '☾' };
+    let mode = 'auto';
+    try { mode = localStorage.getItem('btk.theme') || 'auto'; } catch (e) {}
+
+    function apply() {
+      if (mode === 'auto') root.removeAttribute('data-theme');
+      else root.setAttribute('data-theme', mode);
+      btn.textContent = GLYPH[mode] || GLYPH.auto;
+      btn.title = '主题：' + (LABEL[mode] || '跟随浏览器') + '（点一下切换）';
+      try { localStorage.setItem('btk.theme', mode); } catch (e) {}
+    }
+    btn.addEventListener('click', () => {
+      const scheme = matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+      mode = mode === 'auto' ? (scheme === 'light' ? 'dark' : 'light') : (mode === 'light' ? 'dark' : 'light');
+      btn.dataset.next = mode;
+      apply();
+    });
+    apply();
   }
 
   loadSource();
   wireFeedback();
   wireConsole();
+  wireTheme();
 })();

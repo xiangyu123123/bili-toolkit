@@ -9,6 +9,13 @@
       content="一个可模块化开关的 Bilibili 桌面端油猴脚本：界面净化、播放增强、素材提取、弹幕评论、视频线路测速与手动选线。含安装入口、快捷键表与已知限制说明。"
     />
     <link rel="stylesheet" href="assets/site.css" />
+    <script>
+      // 先落主题再首帧，避免浅色偏好下闪一下深色
+      try {
+        var t = localStorage.getItem("btk.theme");
+        if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <a class="skip" href="#main">跳到主要内容</a>
@@ -25,8 +32,35 @@
           <a href="#feedback">反馈</a>
           <a href="#source">源码</a>
         </nav>
+        <div class="auth-zone">
+          <button class="pill-btn theme-btn" id="theme-btn" type="button" title="主题：跟随浏览器" aria-label="切换主题">◐</button>
+          <button class="pill-btn" id="auth-open" type="button">登录</button>
+          <a class="pill-btn solid" id="auth-console-link" href="#console" hidden>反馈后台 <span class="count" id="auth-count" hidden>0</span></a>
+          <button class="pill-btn" id="auth-logout" type="button" hidden>退出</button>
+        </div>
       </div>
     </header>
+
+    <dialog class="auth" id="auth-dialog" aria-labelledby="auth-dialog-title">
+      <div class="auth-head">
+        <h2 id="auth-dialog-title">站主登录</h2>
+        <button class="x" type="button" id="auth-close" aria-label="关闭登录窗口">×</button>
+      </div>
+      <div class="auth-body">
+        <p class="lede" id="auth-lede">登录后这一页会多出后台：反馈全文列表、逐条删除、导出 JSON。游客只能提交，看不到任何一条。</p>
+        <p class="auth-mode" id="auth-mode"></p>
+        <label>账号
+          <input id="auth-user" maxlength="32" autocomplete="username" spellcheck="false">
+        </label>
+        <label>密码
+          <input id="auth-pass" type="password" maxlength="200" autocomplete="current-password">
+        </label>
+        <p class="auth-err" id="auth-msg" role="alert" aria-live="polite"></p>
+      </div>
+      <div class="auth-foot">
+        <button class="btn primary" type="button" id="auth-go">登录</button>
+      </div>
+    </dialog>
 
     <main id="main" class="wrap">
       <!-- 安装台 -->
@@ -396,6 +430,7 @@ upbili</pre>
           <li class="todo">自动最高画质需要你在登录态的视频页点一次「立即切到最高画质」确认；未登录时 <code>requestQuality(112)</code> 会被接受但不生效，面板会如实显示。</li>
         </ul>
         <h3>更新日志</h3>
+        <p><b>站点更新（安装页本身）</b> · 反馈后台改成<b>右上角「登录」+ 弹窗</b>（原生 <code>&lt;dialog&gt;</code>，<kbd>Esc</kbd> 可关、点遮罩可关、自动聚焦账号栏），登录后右上角出现「反馈后台」入口与<b>未处理条数角标</b>；安装页配色改成<b>跟随浏览器黑白</b>（<code>prefers-color-scheme</code> + <code>color-scheme</code>），顶栏另给一个 <code>◐ / ☀ / ☾</code> 开关可强制浅色或深色，选择记在 <code>localStorage.btk.theme</code>，并在首帧前落主题避免闪色。浅色实测正文对比度 <b>16.28:1</b>、行内代码 <b>14.17:1</b>；顶栏在 380–1280px 宽度下均不再溢出（修掉 <code>.bar nav</code> 缺 <code>min-width:0</code> 导致登录控件被挤出容器 216px 的问题）。</p>
         <p><b>1.6.2</b> · 反馈能直接交了：<b>「反馈」章节做成页内表单</b>（选页面类型、写现象、可选期望与联系方式），提交走同源 <code>POST /functions/v1/app?action=submit</code>，服务端校验后把每一条存成站点私有存储里的 <code>feedback/&lt;uuid&gt;.json</code> —— 站点不开放列表和下载，所以<b>访客写得进、读不出</b>，站主侧可列可下可删。已端到端验证：真实提交返回编号 <code>6c3e4f96</code>，后台列到 <code>738B / application/json</code>，下载回来字段完整。<b>Function 侧的边界全部有用例</b>：正常 201、未知 action 404、GET 405、非 JSON 415、超长体 413、现象过短 400、非法页面 400、空版本 400、控制字符清洗后 201、存储失败 503（且不自动重放）。同时脚本新增 <code>@downloadURL</code>/<code>@updateURL</code>（Tampermonkey 从此能自动检查升级）与控制台「关于 → 复制反馈包」；离线回归 106 项全过。</p>
         <p><b>1.6.1</b> · 修 1.6.0 引入的一个回归：<b>播放器右上角那条小工具的按钮文字看不见了</b>（只剩 <code>1.00x</code>）。原因是把 <code>.btk-btn</code> 改成主题变量后，工具条自己还留着写死的深色玻璃底，浅色主题下就变成"深字压深底"。现在<b>小工具条和它的 ⋯ 二级菜单整体跟随主题</b>（底色 <code>var(--btk-surface)</code>、描边 <code>var(--btk-line)</code>、投影 <code>var(--btk-shadow)</code>），压在画面上靠描边+投影区分。真实视频页实测：浅色下按钮 <code>rgb(24,25,28)</code> 字 / <code>rgb(246,247,248)</code> 底，条底 <code>rgb(255,255,255)</code>，读数 <code>rgb(0,174,236)</code>。离线回归 97 项全过（新增 6 项专测工具条配色）。</p>
         <p><b>1.6.0</b> · 加了<b>「外观」页</b>：面板不再只有深色一套 —— 跟随 B 站 / 浅色 / 深色 三档，外加自定义强调色与面板不透明度，改完立即生效。「跟随 B 站」直接引用 B 站自己在 <code>:root</code> 上发的设计变量（<code>--bg1_float</code> / <code>--text1</code> / <code>--brand_pink</code> 等，现网实测可读），所以它切深色模式面板跟着切，不需要猜。顺带修掉两个在真实浏览器里才看得出来的问题：<b>矮窗口下面板顶出视口</b>（535px 高的窗口里 <code>top = -133px</code>，标题栏和 × 直接被推到屏幕外够不着 —— 这也是之前「右上角 × 无效」的一个成因），现在高度先扣掉悬浮球占位并保证留在视口内；<b>面板 body 出现 4px 横向滚动条</b>（B 站的全局 reset 不覆盖面板内部，<code>width:100%</code> 元素加 padding 就溢出），改为面板内统一 <code>border-box</code>。离线回归 91 项全过。</p>
@@ -414,7 +449,7 @@ upbili</pre>
       <!-- 反馈 -->
       <section id="feedback">
         <h2>反馈</h2>
-        <p class="section-lede">直接在下面填、直接提交 —— 不用登录 GitHub，也不用离开这一页。</p>
+        <p class="section-lede">直接在下面填、直接提交 —— 不用登录 GitHub，也不用离开这一页。站主入口在<b>右上角「登录」</b>：登录后页面下方才会出现反馈后台（列表 / 删除 / 导出），右上角同时显示未处理条数。</p>
 
         <form id="feedback-form" autocomplete="off">
           <div class="fb-grid">
@@ -450,24 +485,9 @@ upbili</pre>
           <p id="fb-result" role="status" aria-live="polite"></p>
         </form>
 
-        <div class="auth-card" id="auth">
-          <h4 id="auth-title">站主登录</h4>
-          <p class="hint-inline" id="auth-note">登录后这一页会多出后台：反馈全文列表、逐条删除、导出 JSON。游客只能提交，看不到任何一条 —— 列表数据每次都要服务端校验会话令牌后才返回，不是靠页面隐藏。</p>
-          <form id="auth-form" autocomplete="off">
-            <div class="auth-grid">
-              <label>账号 <input id="auth-user" maxlength="32" autocomplete="username" spellcheck="false"></label>
-              <label>密码 <input id="auth-pass" type="password" maxlength="200" autocomplete="current-password"></label>
-            </div>
-            <div class="fb-actions">
-              <button class="btn primary" type="submit" id="auth-go">登录</button>
-              <button class="btn tiny" type="button" id="auth-out" hidden>退出登录</button>
-            </div>
-            <p id="auth-msg" role="status" aria-live="polite"></p>
-          </form>
-        </div>
-
         <div id="console" hidden>
           <h3>反馈后台 <span class="tag on">已登录</span></h3>
+          <p class="hint-inline">这一块只在登录后可见；列表数据每次都要服务端校验会话令牌后才返回，不是靠页面隐藏。游客看到的仍然只有上面的提交框。</p>
           <div class="fb-stats" id="fb-stats"></div>
           <div class="fb-actions">
             <button class="btn tiny" type="button" id="fb-reload">刷新列表</button>
