@@ -450,6 +450,32 @@ upbili</pre>
           <p id="fb-result" role="status" aria-live="polite"></p>
         </form>
 
+        <div class="auth-card" id="auth">
+          <h4 id="auth-title">站主登录</h4>
+          <p class="hint-inline" id="auth-note">登录后这一页会多出后台：反馈全文列表、逐条删除、导出 JSON。游客只能提交，看不到任何一条 —— 列表数据每次都要服务端校验会话令牌后才返回，不是靠页面隐藏。</p>
+          <form id="auth-form" autocomplete="off">
+            <div class="auth-grid">
+              <label>账号 <input id="auth-user" maxlength="32" autocomplete="username" spellcheck="false"></label>
+              <label>密码 <input id="auth-pass" type="password" maxlength="200" autocomplete="current-password"></label>
+            </div>
+            <div class="fb-actions">
+              <button class="btn primary" type="submit" id="auth-go">登录</button>
+              <button class="btn tiny" type="button" id="auth-out" hidden>退出登录</button>
+            </div>
+            <p id="auth-msg" role="status" aria-live="polite"></p>
+          </form>
+        </div>
+
+        <div id="console" hidden>
+          <h3>反馈后台 <span class="tag on">已登录</span></h3>
+          <div class="fb-stats" id="fb-stats"></div>
+          <div class="fb-actions">
+            <button class="btn tiny" type="button" id="fb-reload">刷新列表</button>
+            <button class="btn tiny" type="button" id="fb-export">导出 JSON</button>
+          </div>
+          <div id="fb-items"></div>
+        </div>
+
         <div class="cols">
           <div>
             <h4>怎么提一条能直接定位的反馈</h4>

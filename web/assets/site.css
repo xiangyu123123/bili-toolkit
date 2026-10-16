@@ -509,3 +509,26 @@ details p {
 @media (max-width: 720px) {
   .fb-grid { grid-template-columns: 1fr; }
 }
+
+/* ---------- 登录与反馈后台 ---------- */
+.auth-card { border: 1px solid var(--line); border-radius: 10px; background: var(--surface); padding: 14px 16px; margin: 16px 0 0; }
+.auth-card h4 { margin: 0 0 4px; font-size: 15px; }
+.auth-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 10px 0 4px; }
+.auth-grid label { display: flex; flex-direction: column; gap: 6px; font-size: 13.5px; color: var(--muted); }
+.auth-grid input { font: 14px/1 var(--mono); color: var(--text); background: var(--bg-soft); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+.auth-grid input:focus-visible { outline: 3px solid var(--cyan); outline-offset: 2px; }
+#auth-msg { margin: 8px 0 0; font-size: 13.5px; min-height: 20px; }
+#auth-msg.ok { color: var(--cyan); }
+#auth-msg.err { color: var(--amber); }
+.fb-item { border: 1px solid var(--line); border-radius: 10px; background: var(--surface); padding: 13px 15px; margin: 0 0 11px; }
+.fb-item .head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font: 500 12px/1 var(--mono); color: var(--muted); }
+.fb-item .head b { color: var(--cyan); font-weight: 600; }
+.fb-item .content { margin: 8px 0 0; font-size: 15px; line-height: 1.65; white-space: pre-wrap; word-break: break-word; }
+.fb-item .meta { margin: 6px 0 0; font-size: 12.5px; color: var(--muted); line-height: 1.7; word-break: break-word; }
+.fb-item .row { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.fb-item .danger { color: #ffd9d9; border-color: #5c2a33; background: #2a1418; }
+.fb-item .danger:hover { background: #3a1b21; border-color: #7d3a46; }
+.fb-stats { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 14px; }
+.fb-stats span { font: 500 12.5px/1 var(--mono); padding: 6px 10px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line); color: var(--muted); }
+.fb-empty { color: var(--muted); font-size: 14px; padding: 12px 0; }
+@media (max-width: 720px) { .auth-grid { grid-template-columns: 1fr; } }

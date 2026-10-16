@@ -205,6 +205,223 @@
     });
   }
 
+  /* ---------------------------------------------------- 站主登录与反馈后台 */
+
+  const APP = '/functions/v1/app';
+  const PAGE_LABEL = { video: '视频播放页', home: '首页 / 信息流', dynamic: '动态页', space: 'UP 主空间', live: '直播页', other: '其它' };
+  const AUTH_ERRORS = {
+    no_account: '这个站还没初始化账号，先在下面设置一个账号和密码。',
+    account_exists: '账号已经初始化过了，直接登录即可；要改密码得站主本人操作。',
+    bad_credentials: '账号或密码不对。',
+    weak_password: '密码至少 10 位。',
+    invalid_user: '账号名只能是 3–32 位字母、数字、_ . -。',
+    too_many_attempts: '失败次数太多，已临时锁定，10 分钟后再试。',
+    unauthorized: '还没登录。',
+    session_expired: '登录已过期，重新登录一次。',
+    list_failed: '读取列表失败，稍后再试。',
+    delete_failed: '删除失败，条目可能还在。',
+    service_not_configured: '服务端还没配置好。',
+    invalid_id: '要删的编号不合法。'
+  };
+
+  function token() { try { return sessionStorage.getItem('btk.session') || ''; } catch (e) { return ''; } }
+  function setToken(v) { try { if (v) sessionStorage.setItem('btk.session', v); else sessionStorage.removeItem('btk.session'); } catch (e) {} }
+
+  function call(action, opts) {
+    const headers = { 'content-type': 'application/json' };
+    if (token()) headers['x-session'] = token();
+    return fetch(APP + '?action=' + action, Object.assign({ credentials: 'same-origin', headers: headers }, opts || {})).then((r) => {
+      const ct = (r.headers.get('content-type') || '').toLowerCase();
+      if (ct.indexOf('application/json') === -1) throw new Error('HTTP ' + r.status);
+      return r.json().then((data) => ({ status: r.status, data: data }));
+    });
+  }
+
+  function authMsg(text, kind) {
+    const el = document.getElementById('auth-msg');
+    el.textContent = text || '';
+    el.className = kind || '';
+  }
+
+  function failAuth(err) {
+    const m = String((err && err.message) || err);
+    const hit = Object.keys(AUTH_ERRORS).filter((k) => m.indexOf(k) !== -1)[0];
+    authMsg(hit ? AUTH_ERRORS[hit] : ('出错了：' + m), 'err');
+  }
+
+  function errText(res) {
+    const code = res.data && typeof res.data.error === 'string' ? res.data.error : '';
+    return AUTH_ERRORS[code] || ('请求失败（HTTP ' + res.status + (code ? ' · ' + code : '') + '）');
+  }
+
+  function pill(text, cls) {
+    const s = document.createElement('span');
+    s.className = cls || '';
+    s.textContent = text;
+    return s;
+  }
+
+  function renderItem(rec) {
+    const box = document.createElement('article');
+    box.className = 'fb-item';
+    const head = document.createElement('div');
+    head.className = 'head';
+    head.appendChild(pill(PAGE_LABEL[rec.page] || rec.page || '未知页面', 'b'));
+    head.appendChild(pill('v' + (rec.version || '?')));
+    head.appendChild(pill(String(rec.created_at || '').replace('T', ' ').replace(/\.\d+Z$/, ' UTC')));
+    if (rec.contact) head.appendChild(pill('联系：' + rec.contact));
+    box.appendChild(head);
+
+    const body = document.createElement('p');
+    body.className = 'content';
+    body.textContent = rec.unreadable ? '（这条读不出内容，编号 ' + rec.id + '）' : (rec.content || '（空）');
+    box.appendChild(body);
+
+    if (rec.expected) {
+      const exp = document.createElement('p');
+      exp.className = 'meta';
+      exp.textContent = '期望：' + rec.expected;
+      box.appendChild(exp);
+    }
+    const meta = document.createElement('p');
+    meta.className = 'meta';
+    meta.textContent = (rec.browser || '') + (rec.id ? '  ·  ' + rec.id : '');
+    box.appendChild(meta);
+
+    const row = document.createElement('div');
+    row.className = 'row';
+    const copyBtn = document.createElement('button');
+    copyBtn.type = 'button';
+    copyBtn.className = 'btn tiny';
+    copyBtn.textContent = '复制这条';
+    copyBtn.addEventListener('click', () => copy(JSON.stringify(rec, null, 2), '已复制这条反馈的 JSON'));
+    row.appendChild(copyBtn);
+
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'btn tiny danger';
+    del.textContent = '删除';
+    del.addEventListener('click', () => {
+      if (!window.confirm('删除 ' + String(rec.id || '').slice(0, 8) + ' ？不可恢复。')) return;
+      del.disabled = true;
+      call('delete', { method: 'POST', body: JSON.stringify({ id: rec.id }) }).then((res) => {
+        if (!res.data || res.data.ok !== true) throw new Error(errText(res));
+        authMsg('已删除 ' + String(rec.id).slice(0, 8) + '。', 'ok');
+        loadConsole();
+      }, (err) => { del.disabled = false; failAuth(err); });
+    });
+    row.appendChild(del);
+    box.appendChild(row);
+    return box;
+  }
+
+  let consoleItems = [];
+
+  function loadConsole() {
+    authMsg('读取中…');
+    call('list').then((res) => {
+      if (!res.data || res.data.ok !== true) {
+        if (res.status === 401) { setToken(''); showLoggedOut(); }
+        throw new Error(errText(res));
+      }
+      consoleItems = (res.data.items || []).slice().sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
+      const stats = document.getElementById('fb-stats');
+      stats.textContent = '';
+      stats.appendChild(pill('共 ' + consoleItems.length + ' 条'));
+      stats.appendChild(pill('服务端 total ' + res.data.total));
+      stats.appendChild(pill('未处理 ' + consoleItems.filter((r) => r.status === 'new').length + ' 条'));
+      const list = document.getElementById('fb-items');
+      list.textContent = '';
+      if (!consoleItems.length) {
+        const empty = document.createElement('p');
+        empty.className = 'fb-empty';
+        empty.textContent = '还没有人提交反馈。';
+        list.appendChild(empty);
+      } else {
+        consoleItems.forEach((rec) => list.appendChild(renderItem(rec)));
+      }
+      authMsg('');
+    }, (err) => { failAuth(err); showLoggedOut(); });
+  }
+
+  function showLoggedOut() {
+    document.getElementById('console').hidden = true;
+    document.getElementById('auth-form').hidden = false;
+    document.getElementById('auth-out').hidden = true;
+    call('status').then((res) => {
+      const has = !!(res.data && res.data.has_account);
+      document.getElementById('auth-title').textContent = has ? '站主登录' : '初始化站主账号';
+      document.getElementById('auth-go').textContent = has ? '登录' : '创建并登录';
+      document.getElementById('auth-note').textContent = has
+        ? '登录后这一页会多出后台：反馈全文列表、逐条删除、导出 JSON。游客只能提交，看不到任何一条 —— 列表数据每次都要服务端校验会话令牌后才返回，不是靠页面隐藏。'
+        : '第一次使用：设置一个账号和密码（密码至少 10 位），只有这一次能创建。密码只在服务端存 PBKDF2 散列，明文不落盘、不进仓库、也不经过聊天。';
+    }, () => {});
+  }
+
+  function showLoggedIn(user) {
+    document.getElementById('console').hidden = false;
+    document.getElementById('auth-form').hidden = true;
+    document.getElementById('auth-out').hidden = false;
+    document.getElementById('auth-title').textContent = '已登录：' + (user || '站主');
+    loadConsole();
+  }
+
+  function wireConsole() {
+    const form = document.getElementById('auth-form');
+    if (!form) return;
+    let mode = 'login';
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const payload = {
+        user: document.getElementById('auth-user').value.trim(),
+        password: document.getElementById('auth-pass').value
+      };
+      if (!payload.user || !payload.password) return authMsg('账号和密码都要填。', 'err');
+      const go = document.getElementById('auth-go');
+      go.disabled = true;
+      authMsg(mode === 'setup' ? '创建中…' : '登录中…');
+      const start = mode === 'setup'
+        ? call('setup', { method: 'POST', body: JSON.stringify(payload) }).then((res) => {
+            if (!res.data || res.data.ok !== true) throw new Error(errText(res));
+            return call('login', { method: 'POST', body: JSON.stringify(payload) });
+          })
+        : call('login', { method: 'POST', body: JSON.stringify(payload) });
+
+      start.then((res) => {
+        if (!res.data || res.data.ok !== true) throw new Error(errText(res));
+        setToken(res.data.token);
+        document.getElementById('auth-pass').value = '';
+        go.disabled = false;
+        showLoggedIn(res.data.user);
+        say('已登录，反馈后台就在下面。');
+      }, (err) => { go.disabled = false; failAuth(err); });
+    });
+
+    document.getElementById('auth-out').addEventListener('click', () => {
+      call('logout', { method: 'POST', body: '{}' }).catch(() => {});
+      setToken('');
+      showLoggedOut();
+      authMsg('已退出本页登录（会话令牌已作废）。', 'ok');
+    });
+
+    document.getElementById('fb-reload').addEventListener('click', loadConsole);
+    document.getElementById('fb-export').addEventListener('click', () => {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([JSON.stringify(consoleItems, null, 2)], { type: 'application/json' }));
+      a.download = 'bili-toolkit-feedback.json';
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    });
+
+    call('status').then((res) => {
+      mode = res.data && res.data.has_account ? 'login' : 'setup';
+      if (token()) showLoggedIn();
+      else showLoggedOut();
+    }, () => { mode = 'login'; showLoggedOut(); });
+  }
+
   loadSource();
   wireFeedback();
+  wireConsole();
 })();
