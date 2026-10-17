@@ -631,7 +631,7 @@ try {
   check('H 用例执行', false, e.message);
 }
 
-/* I. 画质自动取最高：只用 B 站下发的档位，并确认真的切过去 */
+/* I. 画质自动取最高：三处档位来源取并集，切不过去降一档，确认真切过去才报成功 */
 try {
   const env = boot({ enabled: { clean: true, player: true } });
   env.probe(
@@ -664,7 +664,75 @@ try {
   collect(env2.docEl, 'button').find((b) => b.textContent.trim() === '播放增强').click();
   findButton(env2.docEl.querySelector('#btk-panel'), '立即切到最高画质').click();
   await tick(13500);
-  check('切不动时如实显示未生效', /未生效/.test((env2.docEl.querySelector('#btk-q-stat') || {}).textContent || ''), (env2.docEl.querySelector('#btk-q-stat') || {}).textContent);
+  const badge2 = (env2.docEl.querySelector('#btk-q-stat') || {}).textContent;
+  check('切不动时如实显示未生效', /未生效/.test(badge2 || ''), badge2);
+  check('退档不会退到当前档再报成功', !/已是最高/.test(badge2 || ''), badge2);
+
+  // 核心回归：4K（网页端 qn=120）只在播放器画质菜单里出现，页面 playinfo 给不到时也必须取到
+  const env3 = boot({ enabled: { player: true } });
+  env3.probe(
+    'window.__playinfo__ = { code:0, data:{ quality:80, support_formats:[{quality:80,new_description:"1080P 高清"},{quality:112,new_description:"1080P 高码率"}] } };' +
+      'window.__btkReq = []; window.__cur = 80;' +
+      'window.__INITIAL_STATE__.player = { requestQuality: function(q){ window.__btkReq.push(q); window.__cur = q; },' +
+      ' getSupportedQualityList: function(){ return [112,80]; }, getQuality: function(){ return { realQ: window.__cur }; } };' +
+      'var mkq = function(v, t){ var li = document.createElement("li"); li.className = "bpx-player-ctrl-quality-menu-item";' +
+      ' li.setAttribute("data-value", v); var s = document.createElement("span"); s.className = "bpx-player-ctrl-quality-text";' +
+      ' s.textContent = t; li.appendChild(s); document.body.appendChild(li); };' +
+      'mkq(120, "4K 超高清"); mkq(112, "1080P 高码率"); mkq(80, "1080P 高清"); mkq(0, "自动");'
+  );
+  env3.menu['打开设置面板']();
+  collect(env3.docEl, 'button').find((b) => b.textContent.trim() === '播放增强').click();
+  findButton(env3.docEl.querySelector('#btk-panel'), '立即切到最高画质').click();
+  await tick(1600);
+  const reqs3 = env3.probe('JSON.stringify(window.__btkReq)');
+  check('菜单独有的 4K 被并集取到', reqs3 === '[120]', reqs3);
+  const badge3 = (env3.docEl.querySelector('#btk-q-stat') || {}).textContent;
+  check('档位文案取自菜单项（4K 超高清）', /已切到 4K 超高清/.test(badge3 || ''), badge3);
+  findButton(env3.docEl.querySelector('#btk-panel'), '查看画质档位来源').click();
+  const dbg = (env3.docEl.querySelector('#btk-q-debug') || {}).textContent;
+  check(
+    '档位来源读数含三个源与并集',
+    /页面 playinfo/.test(dbg || '') && /画质菜单】120/.test(dbg || '') && /并集取档】120=4K 超高清/.test(dbg || ''),
+    dbg
+  );
+
+  // 账号拿不到最高档时逐级退回，且按顺序真的试过被拒的那一档
+  const env4 = boot({ enabled: { player: true } });
+  env4.probe(
+    'window.__playinfo__ = { code:0, data:{ quality:16, support_formats:[{quality:16,new_description:"360P 流畅"},{quality:80,new_description:"1080P 高清"},{quality:120,new_description:"4K 超高清"}] } };' +
+      'window.__btkReq = []; window.__cur = 16;' +
+      'window.__INITIAL_STATE__.player = { requestQuality: function(q){ window.__btkReq.push(q); if (q <= 80) window.__cur = q; },' +
+      ' getSupportedQualityList: function(){ return [120,80,16]; }, getQuality: function(){ return { realQ: window.__cur }; } };'
+  );
+  env4.menu['打开设置面板']();
+  collect(env4.docEl, 'button').find((b) => b.textContent.trim() === '播放增强').click();
+  findButton(env4.docEl.querySelector('#btk-panel'), '立即切到最高画质').click();
+  await tick(12500);
+  check('先试 4K 被拒后降到 1080P', env4.probe('JSON.stringify(window.__btkReq)') === '[120,80]', env4.probe('JSON.stringify(window.__btkReq)'));
+  const badge4 = (env4.docEl.querySelector('#btk-q-stat') || {}).textContent;
+  check('降档后确认落在 1080P', /已切到 1080P 高清/.test(badge4 || ''), badge4);
+
+  // 播放器没暴露 requestQuality 时走菜单点击（旧版选择器 .quality-menu-item 在真实 DOM 里根本不存在），
+  // 且点击拿不到的档会弹登录框，必须收掉
+  const env5 = boot({ enabled: { player: true } });
+  env5.probe(
+    'window.__playinfo__ = { code:0, data:{ quality:16, support_formats:[{quality:16,new_description:"360P 流畅"},{quality:120,new_description:"4K 超高清"}] } };' +
+      'window.__cur = 16;' +
+      'window.__INITIAL_STATE__.player = { getQuality: function(){ return { realQ: window.__cur }; } };' +
+      'var mkq = function(v, t){ var li = document.createElement("li"); li.className = "bpx-player-ctrl-quality-menu-item";' +
+      ' li.setAttribute("data-value", v); var s = document.createElement("span"); s.className = "bpx-player-ctrl-quality-text";' +
+      ' s.textContent = t; li.appendChild(s);' +
+      ' li.addEventListener("click", function(){ window.__cur = v; if (v === 120) { var m = document.createElement("div");' +
+      ' m.className = "bili-mini-mask"; document.body.appendChild(m); } });' +
+      ' document.body.appendChild(li); };' +
+      'mkq(120, "4K 超高清"); mkq(16, "360P 流畅");'
+  );
+  env5.menu['打开设置面板']();
+  collect(env5.docEl, 'button').find((b) => b.textContent.trim() === '播放增强').click();
+  findButton(env5.docEl.querySelector('#btk-panel'), '立即切到最高画质').click();
+  await tick(1600);
+  check('无 requestQuality 时按 data-value 点中 4K', /已切到 4K 超高清/.test((env5.docEl.querySelector('#btk-q-stat') || {}).textContent || ''), (env5.docEl.querySelector('#btk-q-stat') || {}).textContent);
+  check('点击引出的登录框被收掉', collect(env5.docEl, '.bili-mini-mask').length === 0, collect(env5.docEl, '.bili-mini-mask').length + ' 个');
 } catch (e) {
   check('I 用例执行', false, e.message);
 }

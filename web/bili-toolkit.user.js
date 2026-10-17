@@ -2,7 +2,7 @@
 // @name         Bilibili 增强工具箱
 // @name:en      Bilibili Toolkit
 // @namespace    bili-toolkit
-// @version      1.6.2
+// @version      1.6.3
 // @description  界面净化（含动态/直播页广告位）/ 播放增强 / 素材提取 / 弹幕评论 / 线路测速选线与 P2P 会话阻断 / 观看干扰弹窗屏蔽，分栏控制台，模块可独立开关
 // @author       Qoder Sites
 // @homepageURL  https://bili-toolkit-ppywmt0k7sa.qoder.website/
@@ -25,7 +25,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.6.2';
+  const VERSION = '1.6.3';
   const W = (typeof unsafeWindow !== 'undefined' && unsafeWindow) || window;
   const CFG_KEY = 'btk.cfg.v1';
 
@@ -1012,7 +1012,7 @@
     };
     v.addEventListener('loadedmetadata', applyRemembered);
     v.addEventListener('loadedmetadata', () => {
-      if (on('player') && cfg.player.autoQuality) setTimeout(() => applyMaxQuality(false), 1500);
+      if (on('player') && cfg.player.autoQuality) scheduleAutoQuality();
     });
     v.addEventListener('ratechange', () => {
       if (cfg.player.remember && v.playbackRate <= (Number(cfg.player.maxSpeed) || 5)) {
@@ -1341,14 +1341,26 @@
 
   /* -------------------------------------------- module: 画质自动取最高 */
 
-  // 只接受 B 站自己下发的可选档位（support_formats / getSupportedQualityList），
-  // 不自己拼 quality 数值去试付费墙外的清晰度。
+  // 档位来源必须并集取：页面内嵌的 __playinfo__ 是服务端按普通 fnval 生成的，4K/8K 只出现在
+  // 播放器自己那次 fnval=4048&fourk=1 的请求里，只信它会永远停在 1080P 高码率。
+  // 并集之外不自己拼 quality 数值去试，切不过去的档由播放器返回次高一档。
   let qualityState = { target: 0, cur: 0, msg: '等待播放器就绪' };
   let qualityTimer = 0;
+  let qualityWaitTimer = 0;
+  let qualityRunKey = '';
+  let qualityUsedClick = false;
 
-  function playerApi() {
+  // 实测网页端 4K 是 120（不是 116）；这里只当档位文案的兜底，绝不拿它当候选档位去试
+  const QN_NAMES = { 16: '360P 流畅', 32: '480P 标清', 64: '720P 准高清', 80: '1080P 高清', 112: '1080P 高码率', 120: '4K 超高清', 127: '8K 超高清' };
+
+  function playerCore() {
     const st = W.__INITIAL_STATE__;
-    const p = st && st.player;
+    return (st && st.player) || null;
+  }
+
+  // 只有能切档的播放器才走 requestQuality；读档位与枚举不能也依赖它，否则接口缺一就全盘失效
+  function playerApi() {
+    const p = playerCore();
     return p && typeof p.requestQuality === 'function' ? p : null;
   }
 
@@ -1357,14 +1369,16 @@
     return Array.isArray(d.support_formats) ? d.support_formats : [];
   }
 
-  function entitledQualities() {
-    const list = supportFormats()
+  function playinfoQualities() {
+    return supportFormats()
       .map((f) => Number(f.quality))
       .filter((n) => n > 0);
-    if (list.length) return list;
-    const api = playerApi();
+  }
+
+  function liveQualities() {
+    const p = playerCore();
     try {
-      const l = api && api.getSupportedQualityList ? api.getSupportedQualityList() : [];
+      const l = p && p.getSupportedQualityList ? p.getSupportedQualityList() : [];
       return (Array.isArray(l) ? l : [])
         .map(Number)
         .filter((n) => n > 0);
@@ -1373,20 +1387,88 @@
     }
   }
 
+  // data-value 就是这一档的 qn，0 是「自动」
+  function menuQualities() {
+    return $$('.bpx-player-ctrl-quality-menu-item')
+      .map((li) => Number(li.getAttribute('data-value')))
+      .filter((n) => n > 0);
+  }
+
+  function availableQualities() {
+    const out = [];
+    [playinfoQualities(), liveQualities(), menuQualities()].forEach((list) => {
+      list.forEach((n) => {
+        if (out.indexOf(n) === -1) out.push(n);
+      });
+    });
+    return out.sort((a, b) => b - a);
+  }
+
+  function partKey() {
+    const st = W.__INITIAL_STATE__ || {};
+    const ps = st.playerStatsData || {};
+    const vd = st.videoData || {};
+    return [vd.bvid || location.href, ps.cid || vd.cid || '', vd.page || ps.page || ''].join('/');
+  }
+
+  let qualityDebugOpen = false;
+  function renderQualityListUI() {
+    const old = document.getElementById('btk-q-debug');
+    if (!qualityDebugOpen) {
+      if (old) old.remove();
+      return;
+    }
+    if (!bodyEl || activeTab !== 'player') return;
+    const merged = availableQualities();
+    const lines = [
+      '【页面 playinfo】' + (playinfoQualities().join(' / ') || '无'),
+      '【播放器枚举】' + (liveQualities().join(' / ') || '无'),
+      '【画质菜单】' + (menuQualities().join(' / ') || '无'),
+      '【并集取档】' + (merged.length ? merged.map((q) => q + '=' + qualityLabel(q)).join(' / ') : '无'),
+      '【当前】' + qualityLabel(currentQuality()) + ' · 【目标】' + (qualityState.target ? qualityLabel(qualityState.target) : '未定')
+    ];
+    const box = el('div');
+    box.id = 'btk-q-debug';
+    lines.forEach((txt) => {
+      const p = el('p', null, txt);
+      p.style.fontFamily = 'var(--btk-mono)';
+      p.style.fontSize = '12.5px';
+      p.style.margin = '8px 0';
+      p.style.padding = '6px 8px';
+      p.style.background = 'var(--surface-2)';
+      p.style.borderRadius = '6px';
+      box.appendChild(p);
+    });
+    if (old) old.replaceWith(box);
+    else bodyEl.appendChild(box);
+  }
+
+  function showQualityDebug(show) {
+    qualityDebugOpen = !!show;
+    renderPanel();
+  }
+
   function formatOf(q) {
     return supportFormats().find((f) => Number(f.quality) === q) || null;
   }
 
   function qualityLabel(q) {
+    if (!q) return '未知档位';
     const f = formatOf(q);
-    if (!f) return q + 'P';
-    return f.display_desc || f.new_description || String(q);
+    if (f && (f.new_description || f.display_desc)) return f.new_description || f.display_desc;
+    const item = $$('.bpx-player-ctrl-quality-menu-item').find((li) => Number(li.getAttribute('data-value')) === q);
+    if (item) {
+      const text = $('.bpx-player-ctrl-quality-text', item);
+      const badge = $('.bpx-player-ctrl-quality-badge', item);
+      return ((text && text.textContent) || String(q)).trim() + (badge ? '（' + badge.textContent.trim() + '）' : '');
+    }
+    return QN_NAMES[q] || q + 'P';
   }
 
   function currentQuality() {
-    const api = playerApi();
+    const p = playerCore();
     try {
-      const g = api && api.getQuality ? api.getQuality() : null;
+      const g = p && p.getQuality ? p.getQuality() : null;
       if (g && Number(g.realQ) > 0) return Number(g.realQ);
     } catch (e) {
       /* 播放器版本没有 realQ 字段时退回 playinfo */
@@ -1407,51 +1489,51 @@
   }
 
   function clickQualityItem(q) {
-    const f = formatOf(q);
-    const key = (f && (f.display_desc || f.new_description)) || '';
-    const token = key.replace(/[^0-9Pp]/g, '').slice(0, 6);
-    if (!token) return false;
-    const hit = $$('.quality-menu-item').find((e) => (e.textContent || '').indexOf(token) !== -1);
-    if (!hit) return false;
-    hit.click();
+    const li = $$('.bpx-player-ctrl-quality-menu-item').find((e) => Number(e.getAttribute('data-value')) === q);
+    if (!li) return false;
+    li.click();
+    qualityUsedClick = true;
     return true;
   }
 
-  function applyMaxQuality(manual) {
-    const list = entitledQualities();
-    if (!list.length) {
-      qualityState.msg = '还没拿到可选画质列表';
-      updateQualityStat();
-      if (manual) toast('播放器还没给出可选画质列表，稍后再点一次');
-      return;
+  // 实测：点不到自己用的档时 B 站会弹登录框，切档过程里顺手收掉
+  function closeQualityPrompt() {
+    if (!qualityUsedClick) return;
+    $$('.bili-mini-mask').forEach((n) => n.remove());
+  }
+
+  function askQuality(target) {
+    const api = playerApi();
+    if (api) {
+      try {
+        api.requestQuality(target);
+        return true;
+      } catch (e) {
+        return clickQualityItem(target);
+      }
     }
-    const target = Math.max.apply(null, list);
+    return clickQualityItem(target);
+  }
+
+  function attemptQuality(list, i, manual) {
+    const top = list[0];
+    const target = list[i];
     const cur = currentQuality();
-    qualityState.target = target;
+    qualityState.target = top;
     qualityState.cur = cur;
-    if (cur === target) {
-      qualityState.msg = '已是最高 ' + qualityLabel(target);
+    if (cur >= top) {
+      qualityState.msg = '已是最高 ' + qualityLabel(top);
       updateQualityStat();
-      if (manual) toast('已经是最高画质：' + qualityLabel(target));
+      renderQualityListUI();
+      if (manual) toast('已经是最高画质：' + qualityLabel(top));
       return;
     }
     qualityState.msg = '正在切到 ' + qualityLabel(target) + '…';
     updateQualityStat();
-    const api = playerApi();
-    let asked = false;
-    if (api) {
-      try {
-        api.requestQuality(target);
-        asked = true;
-      } catch (e) {
-        asked = false;
-      }
-    }
-    if (!asked) asked = clickQualityItem(target);
-    if (!asked) {
-      qualityState.msg = '播放器没暴露切换接口';
-      updateQualityStat();
-      toast('切不动：这个播放器版本没暴露画质接口');
+    renderQualityListUI();
+    qualityUsedClick = false;
+    if (!askQuality(target)) {
+      fallBack(list, i, manual, '这个档没给出切换入口');
       return;
     }
     clearInterval(qualityTimer);
@@ -1459,20 +1541,74 @@
     // 画质切换是异步的，轮询确认真正切过去了再说成功
     qualityTimer = setInterval(() => {
       tries++;
+      closeQualityPrompt();
       const now = currentQuality();
-      if (now === target) {
+      if (now >= target) {
         clearInterval(qualityTimer);
         qualityState.cur = now;
         qualityState.msg = '已切到 ' + qualityLabel(target);
         updateQualityStat();
+        renderQualityListUI();
         toast('画质已切到 ' + qualityLabel(target));
       } else if (tries >= 12) {
         clearInterval(qualityTimer);
-        qualityState.msg = '未生效，仍在 ' + qualityLabel(now);
-        updateQualityStat();
-        toast('画质切换没生效：播放器仍停在 ' + qualityLabel(now) + '（标签页在后台时常见）');
+        fallBack(list, i, manual, qualityLabel(target) + ' 切不过去');
       }
-    }, 1000);
+    }, 800);
+  }
+
+  // 账号拿不到这一档时退回次高一档；退到不高于当前档就别再退，如实报未生效
+  function fallBack(list, i, manual, why) {
+    closeQualityPrompt();
+    const next = list[i + 1];
+    if (next != null && next > currentQuality()) {
+      qualityState.msg = why + '，退回 ' + qualityLabel(next);
+      updateQualityStat();
+      renderQualityListUI();
+      if (manual) toast(qualityState.msg);
+      attemptQuality(list, i + 1, manual);
+      return;
+    }
+    const now = currentQuality();
+    qualityState.msg = '未生效，仍在 ' + qualityLabel(now) + '（' + why + '）';
+    updateQualityStat();
+    renderQualityListUI();
+    if (manual) toast(qualityState.msg);
+  }
+
+  function applyMaxQuality(manual) {
+    const list = availableQualities();
+    if (!list.length) {
+      qualityState.msg = '还没拿到可选画质列表';
+      updateQualityStat();
+      if (manual) toast('播放器还没给出可选画质列表，稍后再点一次');
+      return false;
+    }
+    clearInterval(qualityTimer);
+    clearTimeout(qualityWaitTimer);
+    attemptQuality(list, 0, manual);
+    return true;
+  }
+
+  // 播放器的 playurl 是异步拿的，档位列表要等；列表一出现就只跑一次
+  function scheduleAutoQuality() {
+    if (!on('player') || !cfg.player.autoQuality) return;
+    const key = partKey();
+    if (qualityRunKey === key) return;
+    qualityRunKey = key;
+    clearTimeout(qualityWaitTimer);
+    let waits = 0;
+    const tick = () => {
+      if (!on('player') || !cfg.player.autoQuality) return;
+      if (applyMaxQuality(false)) return;
+      if (++waits >= 20) {
+        qualityState.msg = '还没拿到可选画质列表';
+        updateQualityStat();
+        return;
+      }
+      qualityWaitTimer = setTimeout(tick, 1000);
+    };
+    qualityWaitTimer = setTimeout(tick, 1200);
   }
 
   /* ---------------------------------------- module: 观看干扰（引导弹窗） */
@@ -2560,8 +2696,14 @@
       if (on('player')) {
         s.appendChild(el('div', 'btk-note', '当前倍速'));
         s.appendChild(speedSegment());
-        s.appendChild(switchRow('自动切到最高画质', 'player.autoQuality', { badge: qualityBadge(), tip: '只在 B 站给这个账号下发的档位里取最高，不会去试会员墙外的清晰度。' }));
+        s.appendChild(
+          switchRow('自动切到最高画质', 'player.autoQuality', {
+            badge: qualityBadge(),
+            tip: '页面 playinfo / 播放器枚举 / 画质菜单三处取并集，只切 B 站给这个账号列出来的档；切不过去自动退回次高一档。'
+          })
+        );
         s.appendChild(btn('立即切到最高画质', '', () => applyMaxQuality(true)));
+        s.appendChild(btn(qualityDebugOpen ? '收起画质档位来源' : '查看画质档位来源', '', () => showQualityDebug(!qualityDebugOpen)));
         s.appendChild(numberRow('倍速上限', 'player.maxSpeed', { min: 1, max: 16, step: 0.5, tip: '超出浏览器上限时可能丢帧', rerender: true }));
         s.appendChild(switchRow('记住并恢复倍速', 'player.remember'));
         s.appendChild(switchRow('播放器悬浮工具条', 'player.toolbar', { tip: '鼠标进入播放器时出现在右上角' }));
@@ -2818,6 +2960,7 @@
     if (launcher) launcher.setAttribute('data-count', String(count));
     // 表格必须在子树已连接到文档后渲染，否则 isConnected 为 false
     if (lineTableEl) renderLineTable();
+    renderQualityListUI();
   }
 
   function selectTab(id) {

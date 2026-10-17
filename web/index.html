@@ -165,7 +165,7 @@ iframe[src*="jinkela/short"]
             <li><b>跳过片头 / 片尾</b>：以「秒」为单位。播放中按 <kbd>Shift</kbd>+<kbd>I</kbd> 记录片头结束点、<kbd>Shift</kbd>+<kbd>O</kbd> 记录片尾提前量，或直接在面板里填数字。</li>
             <li><b>播完自动连播</b>：优先点播放器自己的「下一 P」按钮，找不到就按 <code>__INITIAL_STATE__</code> 的分 P 列表跳转。</li>
             <li><b>音量微调</b>：<kbd>,</kbd> <kbd>.</kbd> 每次 ±2%（步长可改）。</li>
-            <li><b>自动最高画质</b>：只从 B 站自己下发的 <code>support_formats</code>（或播放器 <code>getSupportedQualityList()</code>）里取最高档，调 <code>player.requestQuality()</code>，然后<b>轮询确认真切过去了</b>才报成功，切不动就如实显示「未生效，仍在 360P」。实测未登录时列表里虽有 112/80 但切换不生效 —— 需要登录。绝不会自己拼 quality 数值去试会员墙外的档位。</li>
+            <li><b>自动最高画质</b>：档位从<b>三处取并集</b> —— 页面内嵌 <code>__playinfo__.data.support_formats</code>、播放器 <code>getSupportedQualityList()</code>、画质菜单 <code>li[data-value]</code>（菜单是播放器自己那次 <code>fnval=4048&amp;fourk=1</code> 请求渲染出来的，最接近你实际能点到的档）。取并集里的最高档后调 <code>player.requestQuality()</code>，<b>轮询 <code>getQuality().realQ</code> 确认真切过去了才报成功</b>；这一档切不过去就<b>逐级退回次高一档</b>并说明是哪档拿不到，退到不高于当前档就不再退、如实显示「未生效」。绝不自己拼 quality 数值去试账号墙外的清晰度。<b>实测：网页端 4K 是 qn=120（菜单文案「4K 超高清」），不是常说的 116；未登录时 <code>requestQuality(120)</code> 会被静默接受但 <code>realQ</code> 不动 —— 所以「确认 + 降档」是必须的。</b></li>
             <li><b>悬浮工具条</b>：只有 5 个控件 —— 倍速 −/当前值/+、弹幕开关、<code>⋯</code> 展开的二级菜单（设片头、设片尾、复制时间戳、线路测速、打开设置）。实测过：九钮一排会占掉播放器顶部 473px，压到画面上；收窄后是 206px。鼠标进入播放器出现，离开淡出；展开二级菜单时会钉住不消失。</li>
           </ul>
           <h4>限制</h4>
@@ -397,7 +397,7 @@ upbili</pre>
 
       <!-- 校验 -->
       <section id="log">
-        <h2>v1.6.2 的验证范围</h2>
+        <h2>v1.6.3 的验证范围</h2>
         <p class="section-lede">这一版是边注入真实页面边改出来的，所以下面区分「页面里验过」和「只在离线环境验过」。</p>
         <ul class="checks">
           <li class="done"><b>确实离开了 PCDN</b>：改线后重载真实页面，43 个 m4s 分片请求全部落在 <code>upos-sz-mirrorhwo1 / mirrorcoso1 / mirrorbd.bilivideo.com</code>；日志里 <code>mcdn.bilivideo.cn</code>、<code>mountaintoys</code>、<code>os=mcdn</code> 命中数为 <b>0</b>，<code>os=</code> 全是 <code>coso1bv</code> / <code>hwo1bv</code> / <code>bdbv</code>。播放不受影响：实时推进、readyState 4、无 error、缓冲到片尾。</li>
@@ -412,7 +412,11 @@ upbili</pre>
           <li class="done">离线回归 30 项断言全过（<code>tools/sandbox-check.mjs</code>）：PCDN 主/备地址剔除、非命中零丢失、干净响应与「全部命中」时不改写、模块关闭时不读取不改写不发包、每主机一轮一次探测、仅 RTT 与失败态、锁定优先于自动排序且保留其余回退。</li>
           <li class="done">离线回归 50 项断言全过（<code>tools/sandbox-check.mjs</code>：可触发点击与 change、可驱动 MutationObserver 的 DOM 桩），含 <code>instanceof WebSocket</code> 兼容、重复读取不二次过滤、模块关闭时零读取 / 零改写 / 零拦截。</li>
           <li class="done">动态页与直播页实测取样：动态页 <code>.bili-header</code> 存在（顶栏规则通用）、<code>.bili-dyn-banner</code> 命中 1、<code>game-download-notify-*</code> 命中 1；直播页 <code>.bili-download-panel</code> / <code>.download-panel-ctnr</code> / <code>.link-popup-ctnr</code> / <code>.side-bar-popup-cntr</code> / <code>.banner-area</code> 均存在（banner 类元素 18 个），且直播页没有 <code>.bili-header</code>，那组规则在那里会自然显示「本页无命中」。</li>
-          <li class="todo">自动最高画质在<b>未登录</b>真实页面上不生效：列表给出 112/80/64/32/16，但 <code>requestQuality(112)</code> 之后 <code>getQuality().realQ</code> 仍是 16，面板如实显示「未生效，仍在 360P」。需要你登录后再验一次才算通过。</li>
+          <li class="done">画质这块在真实视频页重新量了一遍，改掉三处：<b>①</b> 旧版点击兜底用的选择器 <code>.quality-menu-item</code> <b>在现网根本不存在</b>（真实类名是 <code>.bpx-player-ctrl-quality-menu-item</code>，档位挂在 <code>data-value</code> 上），等于这条路一直是死代码；<b>②</b> 档位文案取 <code>display_desc</code>，112 会显示成「1080P」而丢掉「高码率」后缀 —— 你看到的「最高就是 1080p」有一部分是<b>读数被截短</b>；现在优先用 <code>new_description</code>，没有就走菜单文案带徽标（如「1080P 高码率（大会员）」）；<b>③</b> <code>currentQuality()</code> 原本挂在要求播放器暴露 <code>requestQuality</code> 的那个接口对象上，接口一缺就读不到当前档位，已把「读档位」和「切档位」拆开。</li>
+          <li class="done">实测确认 <b>4K 在网页端是 qn=120</b>（菜单文案「4K 超高清 · 大会员」），未登录取 <code>requestQuality(120)</code> 不报错、不提示、<code>realQ</code> 原地不动；点被拒的档会弹 <code>.bili-mini-mask</code> 登录框，所以脚本只在 <code>requestQuality</code> 抛错时才走点击，并把切档过程中弹出来的登录框收掉。</li>
+          <li class="done">面板「播放增强」页新增<b>「查看画质档位来源」</b>：逐条列出三个源各自的档位、并集结果与当前/目标档位 —— 上一版这段代码写了但没接按钮，所以永远看不到。</li>
+          <li class="done">离线回归 <b>114 项全过</b>（<code>tools/sandbox-check.mjs</code>），画质一组新增 8 条：菜单独有档被并集取到、4K 文案取自菜单项、三源读数正确、4K 被拒后逐级降到 1080P 并确认落点、无 <code>requestQuality</code> 时按 <code>data-value</code> 点中、登录框被收掉、<b>退档不会退到当前档再谎报「已是最高」</b>。</li>
+          <li class="todo">自动最高画质<b>还差你登录态那一次确认</b>：未登录只能验到「取档正确、被拒时如实降档」，验不到「大会员真的切进 120/127」。请在登录态视频页点一次「立即切到最高画质」，或直接开「查看画质档位来源」把三行读数发我 —— 如果那里最高只到 112，说明这个视频本身没有 4K 源，不是脚本压着不切。</li>
           <li class="todo">面板右上角 × 按「<code>setPointerCapture</code> 抢走子按钮 click」的成因改了，程序化点击已验证关闭生效；用真实鼠标点一次的确认还没做。</li>
           <li class="done">修复动态页头部被压坏：动态页的 <code>.left-entry__item</code> 装的是频道按钮，链接同样命中 <code>:has(a[href*="live.bilibili.com"])</code> 这类顶栏规则，导致导航被删、剩余按钮溢出压住搜索框与头像。实测对比：修复前 <code>.left-entry</code> 从 499px 被压到 <b>177px</b>，加了按站点生效（www / t / space / live 各用自己的规则集）后是 433px（只少了游戏下载图标那 66px），搜索框 467–776、右侧入口 786 起，截图确认无重叠。</li>
           <li class="done"><b>登录态真实页面已接管核对</b>（Qoder Browser Connector 连上本机 Edge）：动态页当前生效的净化样式只有 <code>.bili-dyn-item:has(.ad-report)</code> / <code>:has(a[href*="cm.bilibili.com"])</code> / <code>[class*="ad-report"]</code> / <code>.bili-dyn-banner</code> 四条，<b>没有任何一条落在顶栏里</b>；首页顶栏三块（导航 24–446、搜索框 456–776、右侧入口 786–1076）几何正常，截图确认无重叠。</li>
@@ -427,9 +431,10 @@ upbili</pre>
           <li class="done">面板 body 的 <b>4px 横向溢出</b>（表现为一条横向滚动条）定位到 B 站全局 reset 不覆盖面板内部，改为面板内统一 <code>border-box</code> 后 <code>scrollWidth</code> 从 463 回到 459 = <code>clientWidth</code>。</li>
           <li class="todo">三连引导本身没等到（只在特定进度或登录态出现）；已验证的是同一 toast 组件上的「登录 免费享高清视频试看30秒」提示条与三个引导层。</li>
           <li class="todo">评论高亮 / 折叠仍未拿到真实数据：这次会话里 B 站评论模块自身报 <code>bili comments load error</code>，评论 DOM 不存在。面板徽标会显示「未找到评论元素」。</li>
-          <li class="todo">自动最高画质需要你在登录态的视频页点一次「立即切到最高画质」确认；未登录时 <code>requestQuality(112)</code> 会被接受但不生效，面板会如实显示。</li>
+          <li class="todo">自动最高画质需要你在登录态的视频页点一次「立即切到最高画质」确认；未登录时 <code>requestQuality()</code> 会被接受但不生效，面板会如实显示降档结果。</li>
         </ul>
         <h3>更新日志</h3>
+        <p><b>1.6.3</b> · <b>自动最高画质重做</b>：档位不再只信页面内嵌的那一份 <code>support_formats</code>，改为页面 playinfo / 播放器枚举 / 画质菜单 <code>data-value</code> <b>三源并集</b>取最高（4K 只在播放器那次 <code>fourk=1</code> 的请求里给全）；拿到最高档后<b>先确认真切过去</b>，切不过去<b>逐级退回次高一档</b>并说明是哪档账号拿不到，退到不高于当前档就如实报「未生效」而不是假装成功。同时修掉三个真实页面才暴露的问题：点击兜底选择器 <code>.quality-menu-item</code> 在现网不存在（真名 <code>.bpx-player-ctrl-quality-menu-item</code>）、档位文案取 <code>display_desc</code> 会把 112 显示成「1080P」丢掉「高码率」、以及播放器不暴露 <code>requestQuality</code> 时连当前档位都读不到。自动触发从固定 1500ms 改为<b>等档位列表出现再切</b>（最多 20 秒，按分 P 记一次），点被拒档引出的登录框会被收掉。面板「播放增强」新增<b>「查看画质档位来源」</b>三源读数。离线回归 114 项全过（画质组 +8）。</p>
         <p><b>站点更新（安装页本身）</b> · 反馈后台改成<b>右上角「登录」+ 弹窗</b>（原生 <code>&lt;dialog&gt;</code>，<kbd>Esc</kbd> 可关、点遮罩可关、自动聚焦账号栏），登录后右上角出现「反馈后台」入口与<b>未处理条数角标</b>；安装页配色改成<b>跟随浏览器黑白</b>（<code>prefers-color-scheme</code> + <code>color-scheme</code>），顶栏另给一个 <code>◐ / ☀ / ☾</code> 开关可强制浅色或深色，选择记在 <code>localStorage.btk.theme</code>，并在首帧前落主题避免闪色。浅色实测正文对比度 <b>16.28:1</b>、行内代码 <b>14.17:1</b>；顶栏在 380–1280px 宽度下均不再溢出（修掉 <code>.bar nav</code> 缺 <code>min-width:0</code> 导致登录控件被挤出容器 216px 的问题）。</p>
         <p><b>1.6.2</b> · 反馈能直接交了：<b>「反馈」章节做成页内表单</b>（选页面类型、写现象、可选期望与联系方式），提交走同源 <code>POST /functions/v1/app?action=submit</code>，服务端校验后把每一条存成站点私有存储里的 <code>feedback/&lt;uuid&gt;.json</code> —— 站点不开放列表和下载，所以<b>访客写得进、读不出</b>，站主侧可列可下可删。已端到端验证：真实提交返回编号 <code>6c3e4f96</code>，后台列到 <code>738B / application/json</code>，下载回来字段完整。<b>Function 侧的边界全部有用例</b>：正常 201、未知 action 404、GET 405、非 JSON 415、超长体 413、现象过短 400、非法页面 400、空版本 400、控制字符清洗后 201、存储失败 503（且不自动重放）。同时脚本新增 <code>@downloadURL</code>/<code>@updateURL</code>（Tampermonkey 从此能自动检查升级）与控制台「关于 → 复制反馈包」；离线回归 106 项全过。</p>
         <p><b>1.6.1</b> · 修 1.6.0 引入的一个回归：<b>播放器右上角那条小工具的按钮文字看不见了</b>（只剩 <code>1.00x</code>）。原因是把 <code>.btk-btn</code> 改成主题变量后，工具条自己还留着写死的深色玻璃底，浅色主题下就变成"深字压深底"。现在<b>小工具条和它的 ⋯ 二级菜单整体跟随主题</b>（底色 <code>var(--btk-surface)</code>、描边 <code>var(--btk-line)</code>、投影 <code>var(--btk-shadow)</code>），压在画面上靠描边+投影区分。真实视频页实测：浅色下按钮 <code>rgb(24,25,28)</code> 字 / <code>rgb(246,247,248)</code> 底，条底 <code>rgb(255,255,255)</code>，读数 <code>rgb(0,174,236)</code>。离线回归 97 项全过（新增 6 项专测工具条配色）。</p>
@@ -464,7 +469,7 @@ upbili</pre>
               </select>
             </label>
             <label>脚本版本
-              <input id="fb-version" maxlength="24" placeholder="例如 1.6.2">
+              <input id="fb-version" maxlength="24" placeholder="例如 1.6.3">
             </label>
             <label class="wide">现象（必填，至少 5 个字）
               <textarea id="fb-content" rows="4" maxlength="2000" required placeholder="例：动态页顶栏的搜索框被撑得很宽，压到头像那边了"></textarea>
