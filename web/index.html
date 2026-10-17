@@ -74,13 +74,19 @@
         </div>
 
         <div class="actions">
-          <a class="btn primary" href="bili-toolkit.user.js">安装脚本</a>
+          <a
+            class="btn primary"
+            href="https://raw.githubusercontent.com/xiangyu123123/bili-toolkit/main/web/bili-toolkit.user.js"
+            >安装脚本（带自动更新）</a
+          >
           <button class="btn" type="button" data-copy-script>复制完整源码</button>
           <a class="btn" href="bili-toolkit.user.js" download="bili-toolkit.user.js">下载 .user.js 文件</a>
         </div>
         <p class="hint">
-          点「安装脚本」没弹出管理器安装页时：先装管理器，或用「下载文件」再把文件拖进管理器的「实用工具 → 导入」。
-          部分浏览器/管理器需要在设置里打开「允许用户脚本」并授予本站访问权限。
+          「安装脚本」走 GitHub 上的源文件，管理器会同时记下更新源，以后发新版会自动提示升级。本页的
+          <code>bili-toolkit.user.js</code> 只在站点重新发布后才是最新，装完不会自动更新。
+          点「安装脚本」没弹出管理器安装页时：先装管理器，或用「下载文件」再把文件拖进管理器的「实用工具 →
+          导入」—— 但这样装的那份<b>没有更新通道</b>，需要手动重装。部分浏览器/管理器需要在设置里打开「允许用户脚本」并授予本站访问权限。
         </p>
 
         <ul class="chips">
@@ -384,7 +390,8 @@ upbili</pre>
       <section id="source">
         <h2>源码</h2>
         <p class="section-lede">
-          站点上的 <code>bili-toolkit.user.js</code> 是唯一真相，直接看或复制。共
+          唯一真相是 <a href="https://github.com/xiangyu123123/bili-toolkit">GitHub 仓库</a>里的
+          <code>web/bili-toolkit.user.js</code>；下面这份是本站当前已发布副本，站点没重新发布时它会落后。共
           <b id="src-meta">加载中…</b>
         </p>
         <div class="src-bar">
@@ -397,7 +404,7 @@ upbili</pre>
 
       <!-- 校验 -->
       <section id="log">
-        <h2>v1.6.3 的验证范围</h2>
+        <h2>v1.6.4 的验证范围</h2>
         <p class="section-lede">这一版是边注入真实页面边改出来的，所以下面区分「页面里验过」和「只在离线环境验过」。</p>
         <ul class="checks">
           <li class="done"><b>确实离开了 PCDN</b>：改线后重载真实页面，43 个 m4s 分片请求全部落在 <code>upos-sz-mirrorhwo1 / mirrorcoso1 / mirrorbd.bilivideo.com</code>；日志里 <code>mcdn.bilivideo.cn</code>、<code>mountaintoys</code>、<code>os=mcdn</code> 命中数为 <b>0</b>，<code>os=</code> 全是 <code>coso1bv</code> / <code>hwo1bv</code> / <code>bdbv</code>。播放不受影响：实时推进、readyState 4、无 error、缓冲到片尾。</li>
@@ -416,7 +423,9 @@ upbili</pre>
           <li class="done">实测确认 <b>4K 在网页端是 qn=120</b>（菜单文案「4K 超高清 · 大会员」），未登录取 <code>requestQuality(120)</code> 不报错、不提示、<code>realQ</code> 原地不动；点被拒的档会弹 <code>.bili-mini-mask</code> 登录框，所以脚本只在 <code>requestQuality</code> 抛错时才走点击，并把切档过程中弹出来的登录框收掉。</li>
           <li class="done">面板「播放增强」页新增<b>「查看画质档位来源」</b>：逐条列出三个源各自的档位、并集结果与当前/目标档位 —— 上一版这段代码写了但没接按钮，所以永远看不到。</li>
           <li class="done">离线回归 <b>114 项全过</b>（<code>tools/sandbox-check.mjs</code>），画质一组新增 8 条：菜单独有档被并集取到、4K 文案取自菜单项、三源读数正确、4K 被拒后逐级降到 1080P 并确认落点、无 <code>requestQuality</code> 时按 <code>data-value</code> 点中、登录框被收掉、<b>退档不会退到当前档再谎报「已是最高」</b>。</li>
-          <li class="todo">自动最高画质<b>还差你登录态那一次确认</b>：未登录只能验到「取档正确、被拒时如实降档」，验不到「大会员真的切进 120/127」。请在登录态视频页点一次「立即切到最高画质」，或直接开「查看画质档位来源」把三行读数发我 —— 如果那里最高只到 112，说明这个视频本身没有 4K 源，不是脚本压着不切。</li>
+          <li class="done"><b>登录态实测通过（大会员账号，真实浏览器）</b>：在真 8K 源视频上，三个档位源都给出 <code>127=8K 超高清</code>，切档后 <code>getQuality().realQ = 127</code>、<code>videoWidth×videoHeight = 8192×4320</code>，面板徽标显示「已切到 8K 超高清」，三源读数逐条核对一致。同时在<b>没有 8K 片源</b>的视频上确认最高就是 <code>120</code>（网页端 4K 是 qn=120，不是 116），B 站不下发 127 时脚本不拼数值硬试。</li>
+          <li class="done">更新通道换到 GitHub raw 并在你的网络里实测可达（5.3 秒打开、被 Tampermonkey 安装页接管）。这条是本次改动的实际收益：站点发布要排队，仓库推送即生效。</li>
+          <li class="todo">本站那份 <code>bili-toolkit.user.js</code> 仍是 1.6.2（站点还没重新发布），所以从本页旧按钮装到的是旧版；等站点跟上才会一致。脚本自动更新已不依赖它。</li>
           <li class="todo">面板右上角 × 按「<code>setPointerCapture</code> 抢走子按钮 click」的成因改了，程序化点击已验证关闭生效；用真实鼠标点一次的确认还没做。</li>
           <li class="done">修复动态页头部被压坏：动态页的 <code>.left-entry__item</code> 装的是频道按钮，链接同样命中 <code>:has(a[href*="live.bilibili.com"])</code> 这类顶栏规则，导致导航被删、剩余按钮溢出压住搜索框与头像。实测对比：修复前 <code>.left-entry</code> 从 499px 被压到 <b>177px</b>，加了按站点生效（www / t / space / live 各用自己的规则集）后是 433px（只少了游戏下载图标那 66px），搜索框 467–776、右侧入口 786 起，截图确认无重叠。</li>
           <li class="done"><b>登录态真实页面已接管核对</b>（Qoder Browser Connector 连上本机 Edge）：动态页当前生效的净化样式只有 <code>.bili-dyn-item:has(.ad-report)</code> / <code>:has(a[href*="cm.bilibili.com"])</code> / <code>[class*="ad-report"]</code> / <code>.bili-dyn-banner</code> 四条，<b>没有任何一条落在顶栏里</b>；首页顶栏三块（导航 24–446、搜索框 456–776、右侧入口 786–1076）几何正常，截图确认无重叠。</li>
@@ -431,9 +440,9 @@ upbili</pre>
           <li class="done">面板 body 的 <b>4px 横向溢出</b>（表现为一条横向滚动条）定位到 B 站全局 reset 不覆盖面板内部，改为面板内统一 <code>border-box</code> 后 <code>scrollWidth</code> 从 463 回到 459 = <code>clientWidth</code>。</li>
           <li class="todo">三连引导本身没等到（只在特定进度或登录态出现）；已验证的是同一 toast 组件上的「登录 免费享高清视频试看30秒」提示条与三个引导层。</li>
           <li class="todo">评论高亮 / 折叠仍未拿到真实数据：这次会话里 B 站评论模块自身报 <code>bili comments load error</code>，评论 DOM 不存在。面板徽标会显示「未找到评论元素」。</li>
-          <li class="todo">自动最高画质需要你在登录态的视频页点一次「立即切到最高画质」确认；未登录时 <code>requestQuality()</code> 会被接受但不生效，面板会如实显示降档结果。</li>
         </ul>
         <h3>更新日志</h3>
+        <p><b>1.6.4</b> · <b>更新通道改到 GitHub raw</b>：<code>@downloadURL</code> / <code>@updateURL</code> 不再指向本站，改成 <code>raw.githubusercontent.com/xiangyu123123/bili-toolkit/main/web/bili-toolkit.user.js</code>。原因是本站发布要走排队，而仓库推送即生效 —— 以后 <code>git push</code> 就是发布。你这边网络实测：该 raw 地址可直连（5.3s 打开并被 Tampermonkey 安装页接管）。<b>注意</b>：只有从这个链接装的那份才有更新通道；粘贴导入或拖文件装的那份不记录更新源（所以也不会被自动覆盖）。本页「安装脚本」按钮已改指 GitHub，本站那份 <code>bili-toolkit.user.js</code> 要等站点重新发布才会跟上。</p>
         <p><b>1.6.3</b> · <b>自动最高画质重做</b>：档位不再只信页面内嵌的那一份 <code>support_formats</code>，改为页面 playinfo / 播放器枚举 / 画质菜单 <code>data-value</code> <b>三源并集</b>取最高（4K 只在播放器那次 <code>fourk=1</code> 的请求里给全）；拿到最高档后<b>先确认真切过去</b>，切不过去<b>逐级退回次高一档</b>并说明是哪档账号拿不到，退到不高于当前档就如实报「未生效」而不是假装成功。同时修掉三个真实页面才暴露的问题：点击兜底选择器 <code>.quality-menu-item</code> 在现网不存在（真名 <code>.bpx-player-ctrl-quality-menu-item</code>）、档位文案取 <code>display_desc</code> 会把 112 显示成「1080P」丢掉「高码率」、以及播放器不暴露 <code>requestQuality</code> 时连当前档位都读不到。自动触发从固定 1500ms 改为<b>等档位列表出现再切</b>（最多 20 秒，按分 P 记一次），点被拒档引出的登录框会被收掉。面板「播放增强」新增<b>「查看画质档位来源」</b>三源读数。离线回归 114 项全过（画质组 +8）。</p>
         <p><b>站点更新（安装页本身）</b> · 反馈后台改成<b>右上角「登录」+ 弹窗</b>（原生 <code>&lt;dialog&gt;</code>，<kbd>Esc</kbd> 可关、点遮罩可关、自动聚焦账号栏），登录后右上角出现「反馈后台」入口与<b>未处理条数角标</b>；安装页配色改成<b>跟随浏览器黑白</b>（<code>prefers-color-scheme</code> + <code>color-scheme</code>），顶栏另给一个 <code>◐ / ☀ / ☾</code> 开关可强制浅色或深色，选择记在 <code>localStorage.btk.theme</code>，并在首帧前落主题避免闪色。浅色实测正文对比度 <b>16.28:1</b>、行内代码 <b>14.17:1</b>；顶栏在 380–1280px 宽度下均不再溢出（修掉 <code>.bar nav</code> 缺 <code>min-width:0</code> 导致登录控件被挤出容器 216px 的问题）。</p>
         <p><b>1.6.2</b> · 反馈能直接交了：<b>「反馈」章节做成页内表单</b>（选页面类型、写现象、可选期望与联系方式），提交走同源 <code>POST /functions/v1/app?action=submit</code>，服务端校验后把每一条存成站点私有存储里的 <code>feedback/&lt;uuid&gt;.json</code> —— 站点不开放列表和下载，所以<b>访客写得进、读不出</b>，站主侧可列可下可删。已端到端验证：真实提交返回编号 <code>6c3e4f96</code>，后台列到 <code>738B / application/json</code>，下载回来字段完整。<b>Function 侧的边界全部有用例</b>：正常 201、未知 action 404、GET 405、非 JSON 415、超长体 413、现象过短 400、非法页面 400、空版本 400、控制字符清洗后 201、存储失败 503（且不自动重放）。同时脚本新增 <code>@downloadURL</code>/<code>@updateURL</code>（Tampermonkey 从此能自动检查升级）与控制台「关于 → 复制反馈包」；离线回归 106 项全过。</p>
@@ -518,7 +527,11 @@ upbili</pre>
               <li>不主动上传：复制走你浏览器的剪贴板，脚本不发任何网络请求，也没有统计代码。</li>
             </ul>
             <h4>自动更新</h4>
-            <p>脚本头部带 <code>@downloadURL</code> / <code>@updateURL</code>，指向本页同域的 <code>bili-toolkit.user.js</code>；Tampermonkey 会按它自己的更新周期检查并提示升级，也可以在扩展面板里手动「检查更新」。</p>
+            <p>
+              脚本头部的 <code>@downloadURL</code> / <code>@updateURL</code> 指向 <b>GitHub raw 上的源文件</b>，所以发布就是
+              <code>git push</code>：Tampermonkey 按自己的更新周期检查并提示升级，也可以在扩展面板里手动「检查更新」。
+              <b>前提是从带更新源的链接安装</b> —— 在编辑器里粘贴或拖文件导入的那份不会记录更新源，既不自动升级也不会被覆盖，只能手动重装。
+            </p>
             <button class="btn tiny" type="button" data-copy="#env-pack">复制本页环境</button>
             <pre id="env-pack" class="code" tabindex="0" role="region" aria-label="本页环境"></pre>
           </div>

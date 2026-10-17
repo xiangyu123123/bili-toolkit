@@ -3,17 +3,19 @@
 单文件 Tampermonkey / Violentmonkey 脚本，给 B 站桌面端网页加五件事：**界面净化**、**播放增强**、**素材提取**、**弹幕评论**、**线路测速选线与 P2P 阻断**，外加一套**跟随 B 站的皮肤系统**。所有功能都能在控制台里单独关掉。
 
 - 安装页 / 文档：<https://bili-toolkit-ppywmt0k7sa.qoder.website/>
-- 直接安装脚本：<https://bili-toolkit-ppywmt0k7sa.qoder.website/bili-toolkit.user.js>
+- **直接安装脚本（推荐，带自动更新）**：<https://raw.githubusercontent.com/xiangyu123123/bili-toolkit/main/web/bili-toolkit.user.js>
 - 仓库：<https://github.com/xiangyu123123/bili-toolkit>
 - 当前版本：`1.6.3`
 
 ## 安装
 
 1. 先装浏览器扩展 [Tampermonkey](https://www.tampermonkey.net/) 或 Violentmonkey（Edge / Chrome 均可）。
-2. 打开上面的「直接安装脚本」链接 → 扩展会弹出安装确认 → 点安装。
+2. 打开上面的「直接安装脚本」链接 → Tampermonkey 会弹出安装确认页 → 点安装。**必须是这个链接**：从 GitHub raw 装，管理器才会记下更新源。
 3. 进任意 B 站页面，右下角出现 **B+** 悬浮球即成功；<kbd>Alt</kbd>+<kbd>S</kbd> 打开控制台。
 
-脚本头部带 `@downloadURL` / `@updateURL` 指向上面那个地址，所以 Tampermonkey 会按它自己的更新周期检查升级；也可以随时从安装页重新安装覆盖。
+脚本头部的 `@downloadURL` / `@updateURL` 指向 GitHub raw 上的本文件，所以 `git push` 之后 Tampermonkey 按自己的更新周期就能拿到新版，不需要等站点发布。
+
+**手动粘贴导入的脚本没有更新通道** —— 在管理器编辑器里新建/粘贴、或把 `.user.js` 文件拖进「实用工具 → 导入」装的那份，管理器不会记录更新源，既不会自动升级也不会被覆盖。要自动更新就得从上面那个链接重装一次。
 
 生效范围：`www.bilibili.com`、`t.bilibili.com`（动态）、`space.bilibili.com`（UP 主空间）、`live.bilibili.com`（直播）桌面端。`m.bilibili.com` 不在匹配内。
 

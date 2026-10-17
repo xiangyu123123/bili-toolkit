@@ -2,13 +2,13 @@
 // @name         Bilibili 增强工具箱
 // @name:en      Bilibili Toolkit
 // @namespace    bili-toolkit
-// @version      1.6.3
+// @version      1.6.4
 // @description  界面净化（含动态/直播页广告位）/ 播放增强 / 素材提取 / 弹幕评论 / 线路测速选线与 P2P 会话阻断 / 观看干扰弹窗屏蔽，分栏控制台，模块可独立开关
 // @author       Qoder Sites
 // @homepageURL  https://bili-toolkit-ppywmt0k7sa.qoder.website/
 // @supportURL   https://bili-toolkit-ppywmt0k7sa.qoder.website/#feedback
-// @downloadURL  https://bili-toolkit-ppywmt0k7sa.qoder.website/bili-toolkit.user.js
-// @updateURL    https://bili-toolkit-ppywmt0k7sa.qoder.website/bili-toolkit.user.js
+// @downloadURL  https://raw.githubusercontent.com/xiangyu123123/bili-toolkit/main/web/bili-toolkit.user.js
+// @updateURL    https://raw.githubusercontent.com/xiangyu123123/bili-toolkit/main/web/bili-toolkit.user.js
 // @match        https://www.bilibili.com/*
 // @match        https://t.bilibili.com/*
 // @match        https://space.bilibili.com/*
@@ -25,7 +25,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.6.3';
+  const VERSION = '1.6.4';
   const W = (typeof unsafeWindow !== 'undefined' && unsafeWindow) || window;
   const CFG_KEY = 'btk.cfg.v1';
 

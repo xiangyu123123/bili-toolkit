@@ -977,6 +977,17 @@ try {
 try {
   check('脚本头带 @downloadURL 指向自身', /^\/\/ @downloadURL\s+https:\/\/\S+bili-toolkit\.user\.js$/m.test(SRC), (SRC.match(/^\/\/ @downloadURL.*$/m) || [''])[0]);
   check('脚本头带 @updateURL（Tampermonkey 才能自动检查更新）', /^\/\/ @updateURL\s+https:\/\/\S+bili-toolkit\.user\.js$/m.test(SRC), '');
+  const RAW = 'https://raw\\.githubusercontent\\.com/xiangyu123123/bili-toolkit/main/web/bili-toolkit\\.user\\.js';
+  check(
+    '更新源指向 GitHub raw（发布 = git push，不依赖站点排队）',
+    new RegExp('^// @updateURL\\s+' + RAW + '$', 'm').test(SRC),
+    (SRC.match(/^\/\/ @updateURL.*$/m) || [''])[0]
+  );
+  check(
+    '下载源同样指向 GitHub raw，避免装到旧副本',
+    new RegExp('^// @downloadURL\\s+' + RAW + '$', 'm').test(SRC),
+    (SRC.match(/^\/\/ @downloadURL.*$/m) || [''])[0]
+  );
   check('脚本头带 @supportURL 指向反馈页', /^\/\/ @supportURL\s+https:\/\/\S+\/#feedback$/m.test(SRC), (SRC.match(/^\/\/ @supportURL.*$/m) || [''])[0]);
 
   const env = boot({ enabled: { clean: true, cdn: true }, clean: { liveCard: true }, cdn: { pin: 'fast.example.com' } });
